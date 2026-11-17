@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Treasure Map</title>
+<meta name="description" content="OpenStreetMap data drawn as old pirate treasure charts: a live chart of any coast, and a treasure hunt on four legendary islands.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Pirata+One&display=swap">
+<style>
+:root {
+  --table: #0f1d1c;
+  --rule: #2c4340;
+  --parch: #ecdcb6;
+  --parch-dim: #b3a685;
+  --paper: #e8d4a4;
+  --ink: #2a190b;
+  --brass: #d4ac55;
+  --font-display: "Pirata One", Georgia, serif;
+  --font-body: "IM Fell English", Georgia, serif;
+  --font-sc: "IM Fell English SC", "IM Fell English", Georgia, serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; min-height: 100vh; background: var(--table); color: var(--parch); font-family: var(--font-body); font-size: 18px; line-height: 1.5;
+  padding: max(40px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) 40px max(20px, env(safe-area-inset-left, 0px));
+}
+main { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px; }
+h1 { font-family: var(--font-display); font-weight: normal; font-size: clamp(44px, 9vw, 72px); line-height: 1; margin: 0; color: var(--brass); }
+.lede { margin: 10px 0 0; font-style: italic; color: var(--parch-dim); max-width: 60ch; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+.chart {
+  display: flex; flex-direction: column; gap: 8px; padding: 22px 24px 20px; border-radius: 2px; color: var(--ink); text-decoration: none;
+  background: radial-gradient(120% 90% at 30% 20%, rgba(255, 246, 220, 0.55), rgba(255, 246, 220, 0) 60%),
+              radial-gradient(80% 60% at 90% 100%, rgba(120, 70, 20, 0.22), rgba(120, 70, 20, 0) 70%), var(--paper);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4); transition: transform 0.15s ease;
+}
+.chart:hover, .chart:focus-visible { transform: translateY(-3px) rotate(-0.3deg); }
+.chart:focus-visible { outline: 2px solid var(--brass); outline-offset: 4px; }
+.kind { font-family: var(--font-sc); letter-spacing: 0.12em; font-size: 13px; color: #7a3b1d; }
+.chart h2 { font-family: var(--font-display); font-weight: normal; font-size: 34px; line-height: 1.05; margin: 0; }
+.chart p { margin: 0; font-size: 16px; }
+.go { margin-top: auto; padding-top: 8px; font-family: var(--font-sc); letter-spacing: 0.08em; font-size: 15px; }
+footer { font-size: 14px; color: var(--parch-dim); border-top: 1px solid var(--rule); padding-top: 14px; }
+footer a { color: var(--parch); }
+@media (prefers-reduced-motion: reduce) { .chart { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Treasure Map</h1>
+    <p class="lede">OpenStreetMap data, inked as old pirate charts.</p>
+  </header>
+  <div class="charts">
+    <a class="chart" href="renderer/">
+      <span class="kind">Live chart</span>
+      <h2>Any Coast on Earth</h2>
+      <p>Search a harbour, then pan and zoom. Coastlines, woods, roads and wrecks are fetched from OpenStreetMap and drawn as you go.</p>
+      <span class="go">Unfurl the chart &rarr;</span>
+    </a>
+    <a class="chart" href="island-hunt/">
+      <span class="kind">Game</span>
+      <h2>Paces to the Gold</h2>
+      <p>Follow the captain&rsquo;s paces and bearings from a landmark, then dig. Four real islands with treasure legends, from Oak Island to Cocos.</p>
+      <span class="go">Start the hunt &rarr;</span>
+    </a>
+  </div>
+  <footer>
+    Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, ODbL.
+    The live chart loads data through the Overpass API, which is a shared service and is sometimes slow.
+  </footer>
+</main>
+</body>
+</html>

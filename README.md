@@ -2,6 +2,12 @@
 
 OpenStreetMap data drawn as old pirate treasure charts.
 
+## Hosting
+
+The site is plain static files, so GitHub Pages can serve it from the `main` branch root
+(Settings → Pages → Deploy from a branch → `main` / `/ (root)`). `index.html` links to both
+charts and `.nojekyll` makes Pages serve the files as they are.
+
 ## island-hunt — *Paces to the Gold*
 
 A treasure-hunt game on four real islands with treasure legends (Oak Island, Gardiners Island,
