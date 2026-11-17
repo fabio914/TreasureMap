@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Offline render test</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Pirata+One&display=swap">
+<style>
+  html, body { margin: 0; height: 100%; background: #0f1d1c; color: #ecdcb6; font: 14px Georgia, serif; overflow: hidden; }
+  #wrap { position: absolute; inset: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #log { position: absolute; left: 40px; bottom: 34px; background: rgba(15,29,28,.9); padding: 4px 8px; white-space: pre; }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="map"></canvas><canvas id="hud"></canvas></div>
+<div id="log">loading…</div>
+<script type="module">
+// Renders a saved Overpass response (test/fixtures/<f>.json) without any network access.
+// Usage: test/render.html?f=oak[&zoom=16&lon=..&lat=..]
+import { OsmStore } from '../src/osm.js';
+import { View, project, resForZoom } from '../src/geo.js';
+import { TreasureRenderer } from '../src/renderer.js';
+import { hudLayout, drawHud } from '../src/hud.js';
+const log = document.getElementById('log');
+window.addEventListener('error', (e) => { log.textContent = 'ERROR: ' + e.message; document.title = 'error'; });
+try {
+  const qs = new URLSearchParams(location.search);
+  const fx = await (await fetch(`./fixtures/${qs.get('f') || 'oak'}.json`)).json();
+  const lon = +(qs.get('lon') ?? fx.view.lon), lat = +(qs.get('lat') ?? fx.view.lat), zoom = +(qs.get('zoom') ?? fx.view.zoom);
+  await Promise.race([Promise.all(['14px "IM Fell English"', 'italic 14px "IM Fell English"', '14px "IM Fell English SC"', '14px "Pirata One"'].map((f) => document.fonts.load(f))), new Promise((r) => setTimeout(r, 4000))]);
+  const store = new OsmStore();
+  let t = performance.now();
+  store.ingest(fx.elements);
+  const tIngest = performance.now() - t;
+  const w = innerWidth, h = innerHeight, dpr = devicePixelRatio || 1;
+  const [cx, cy] = project(lon, lat);
+  const view = new View({ width: w, height: h, cx, cy, res: resForZoom(zoom) });
+  const map = document.getElementById('map'), hud = document.getElementById('hud');
+  for (const c of [map, hud]) { c.width = w * dpr; c.height = h * dpr; }
+  const r = new TreasureRenderer();
+  const layout = hudLayout(w, h);
+  t = performance.now();
+  const res = r.render(map.getContext('2d'), view, store, { dpr, hud: layout, coastReady: true });
+  const tRender = performance.now() - t;
+  drawHud(hud.getContext('2d'), view, layout, { dpr, title: res.title || 'Terra Incognita', paperTile: r.paperTile });
+  // second render to measure a warm frame
+  t = performance.now();
+  r.render(map.getContext('2d'), view, store, { dpr, hud: layout, coastReady: true });
+  const tWarm = performance.now() - t;
+  log.textContent = `${store.items.size} features, ${store.coast.size} coast ways · ingest ${tIngest.toFixed(0)} ms · render ${tRender.toFixed(0)} ms (warm ${tWarm.toFixed(0)} ms) · title “${res.title}” · base ${res.base} · ${res.symbols.length} symbols`;
+  document.title = 'done';
+} catch (err) {
+  log.textContent = 'ERROR: ' + (err.stack || err);
+  document.title = 'error';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Treasure Chart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Pirata+One&display=swap">
+<style>
+:root {
+  --table: #0f1d1c;
+  --panel: rgba(15, 29, 28, 0.9);
+  --rule: #2c4340;
+  --parch: #ecdcb6;
+  --parch-dim: #b3a685;
+  --paper: #e8d4a4;
+  --ink: #2a190b;
+  --brass: #d4ac55;
+  --font-display: "Pirata One", Georgia, serif;
+  --font-body: "IM Fell English", Georgia, serif;
+  --font-sc: "IM Fell English SC", "IM Fell English", Georgia, serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+[hidden] { display: none !important; }
+body { background: var(--table); color: var(--parch); font-family: var(--font-body); font-size: 16px; overflow: hidden; }
+#map { position: absolute; inset: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+#map canvas:focus-visible { outline: none; }
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+.log {
+  position: absolute; z-index: 5; left: calc(env(safe-area-inset-left, 0px) + 44px); top: calc(env(safe-area-inset-top, 0px) + 44px);
+  width: min(300px, calc(100vw - 88px)); background: var(--panel); border: 1px solid var(--rule); border-radius: 4px;
+  padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.log h1 { margin: 0; font-family: var(--font-display); font-weight: normal; font-size: 28px; line-height: 1; color: var(--brass); }
+.log .sub { margin: 2px 0 0; font-style: italic; color: var(--parch-dim); font-size: 14px; }
+.log form { display: flex; gap: 6px; }
+.log input, .log select {
+  font: inherit; color: var(--parch); background: #162826; border: 1px solid var(--rule); border-radius: 3px; padding: 7px 9px; min-width: 0;
+}
+.log input { flex: 1; }
+.log input::placeholder { color: var(--parch-dim); font-style: italic; }
+.btn {
+  font: inherit; font-family: var(--font-sc); letter-spacing: 0.06em; font-size: 14px; cursor: pointer;
+  color: var(--ink); background: var(--brass); border: 1px solid var(--brass); border-radius: 3px; padding: 6px 12px;
+}
+.btn:hover { background: var(--parch); border-color: var(--parch); }
+.label { font-family: var(--font-sc); letter-spacing: 0.1em; font-size: 12px; color: var(--parch-dim); }
+.results { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow: auto; }
+.results button {
+  width: 100%; text-align: left; font: inherit; font-size: 14px; color: var(--parch); background: none; border: 0; padding: 5px 6px; border-radius: 3px; cursor: pointer;
+}
+.results button:hover { background: #1d3331; }
+.ports { display: flex; flex-wrap: wrap; gap: 4px; }
+.ports button {
+  font: inherit; font-size: 14px; color: var(--parch); background: none; border: 1px solid var(--rule); border-radius: 3px; padding: 3px 8px; cursor: pointer;
+}
+.ports button:hover { border-color: var(--parch-dim); }
+.status { font-size: 13px; color: var(--parch-dim); font-style: italic; min-height: 1.3em; display: flex; gap: 8px; align-items: center; }
+.status .dot { width: 8px; height: 8px; border-radius: 50%; background: #6c8f5a; flex: none; }
+.status.busy .dot { background: var(--brass); animation: pulse 1s infinite alternate; }
+.status.err .dot { background: #c0392b; }
+@keyframes pulse { from { opacity: 0.35; } to { opacity: 1; } }
+.toggle { background: none; border: 0; color: var(--parch-dim); font: inherit; font-size: 13px; padding: 0; cursor: pointer; text-align: left; font-style: italic; }
+.zoom {
+  position: absolute; z-index: 5; right: calc(env(safe-area-inset-right, 0px) + 44px); bottom: calc(env(safe-area-inset-bottom, 0px) + 56px);
+  display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; overflow: hidden;
+}
+.zoom button { width: 40px; height: 40px; font: inherit; font-size: 22px; line-height: 1; color: var(--parch); background: none; border: 0; cursor: pointer; }
+.zoom button + button { border-top: 1px solid var(--rule); }
+.zoom button:hover { background: #1d3331; }
+
+.tm-popup {
+  position: absolute; z-index: 6; max-width: 260px; padding: 10px 14px 9px; color: var(--ink); pointer-events: auto;
+  background: radial-gradient(120% 90% at 30% 20%, rgba(255, 246, 220, 0.55), rgba(255, 246, 220, 0) 60%), var(--paper);
+  border-radius: 2px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); font-family: var(--font-body);
+}
+.tm-popup-kind { font-family: var(--font-sc); letter-spacing: 0.1em; font-size: 12px; color: #7a3b1d; }
+.tm-popup-name { font-size: 19px; line-height: 1.2; }
+.tm-popup-row { font-size: 14px; font-style: italic; }
+.tm-popup-links { font-size: 13px; margin-top: 4px; }
+.tm-popup-links:empty { display: none; }
+.tm-popup a { color: #6b2f12; }
+
+@media (max-width: 600px) {
+  .log { left: calc(env(safe-area-inset-left, 0px) + 28px); top: calc(env(safe-area-inset-top, 0px) + 28px); width: calc(100vw - 56px); padding: 10px 12px; gap: 8px; }
+  .log h1 { font-size: 23px; }
+  .zoom { right: calc(env(safe-area-inset-right, 0px) + 28px); bottom: calc(env(safe-area-inset-bottom, 0px) + 40px); }
+}
+@media (prefers-reduced-motion: reduce) { .status.busy .dot { animation: none; } }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<section class="log" aria-label="Chart controls">
+  <div>
+    <h1>Treasure Chart</h1>
+    <p class="sub">Any coast on Earth, inked from OpenStreetMap.</p>
+  </div>
+  <button class="toggle" id="toggle" aria-expanded="true">Hide the logbook</button>
+  <div id="body" class="body" style="display:flex;flex-direction:column;gap:10px">
+    <form id="search" role="search">
+      <input id="q" type="search" placeholder="Search a port or place" aria-label="Search a place" autocomplete="off">
+      <button class="btn" type="submit">Sail</button>
+    </form>
+    <ul class="results" id="results" hidden></ul>
+    <div class="label">Famous anchorages</div>
+    <div class="ports" id="ports"></div>
+  </div>
+  <div class="status" id="status" role="status"><span class="dot"></span><span id="status-text">Unfurling the chart&hellip;</span></div>
+</section>
+
+<div class="zoom" role="group" aria-label="Zoom">
+  <button id="zin" title="Zoom in" aria-label="Zoom in">+</button>
+  <button id="zout" title="Zoom out" aria-label="Zoom out">&minus;</button>
+</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

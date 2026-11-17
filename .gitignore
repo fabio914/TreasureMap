@@ -2,3 +2,6 @@
 island-hunt/osm/
 __pycache__/
 .DS_Store
+
+# Overpass responses for the offline render test (make with renderer/test/make-fixture.mjs)
+renderer/test/fixtures/

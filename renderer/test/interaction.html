@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Interaction test</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0f1d1c; color: #ecdcb6; font: 14px Georgia, serif; }
+  #map { position: absolute; inset: 0; }
+  #out { position: absolute; left: 40px; bottom: 34px; z-index: 9; background: rgba(15,29,28,.92); padding: 6px 10px; white-space: pre; }
+  .tm-popup { position: absolute; z-index: 6; background: #e8d4a4; color: #2a190b; padding: 8px 12px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="out">running…</div>
+<script type="module">
+// Drives TreasureMap with synthetic pointer and wheel events against the mock Overpass server
+// (test/mock_overpass.py) and reports each check. Open with ?overpass=<mock url>.
+import { TreasureMap } from '../src/map.js';
+const out = document.getElementById('out');
+const results = [];
+const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${name}${extra ? '  (' + extra + ')' : ''}`);
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (fn, ms = 15000) => { const t = Date.now(); while (Date.now() - t < ms) { if (fn()) return true; await wait(50); } return false; };
+const errors = [];
+window.addEventListener('error', (e) => errors.push(e.message));
+window.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
+try {
+  const endpoint = new URLSearchParams(location.search).get('overpass');
+  const map = new TreasureMap(document.getElementById('map'), { center: [-64.2935, 44.5135], zoom: 15.8, endpoints: [endpoint] });
+  let renders = 0, lastStatus = null, selected = null;
+  map.addEventListener('render', () => renders++);
+  map.addEventListener('status', (e) => { lastStatus = e.detail; });
+  map.addEventListener('select', (e) => { selected = e.detail; });
+
+  check('data arrives and is drawn', await until(() => map.store.items.size > 0 && renders >= 2), `${map.store.items.size} features, ${renders} renders`);
+  check('coastline makes land and sea', map.last && map.last.base === 'mixed', map.last && map.last.base);
+  check('title comes from the data', map.last && map.last.title === 'Oak Island', map.last && map.last.title);
+
+  const cv = map.canvas, r = cv.getBoundingClientRect();
+  const fire = (type, x, y, extra = {}) => cv.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: r.left + x, clientY: r.top + y, pointerId: extra.id ?? 1, pointerType: 'mouse', isPrimary: true, button: 0, buttons: type === 'pointerup' ? 0 : 1, ...extra }));
+
+  // drag pans the view
+  const [lon0, lat0] = map.getCenter();
+  fire('pointerdown', 600, 400); for (let i = 1; i <= 10; i++) fire('pointermove', 600 - i * 20, 400 + i * 10); fire('pointerup', 400, 500);
+  const [lon1, lat1] = map.getCenter();
+  // dragging the chart left and down moves the view east and north
+  check('drag pans east and north', lon1 > lon0 && lat1 > lat0, `${(lon1 - lon0).toFixed(5)}, ${(lat1 - lat0).toFixed(5)}`);
+  const before = renders; await wait(400);
+  check('view re-renders after the gesture settles', renders > before, `${renders - before} renders`);
+
+  // wheel zooms around the cursor
+  const z0 = map.getZoom();
+  cv.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: r.left + 700, clientY: r.top + 450, deltaY: -300 }));
+  check('wheel zooms in', map.getZoom() > z0 + 0.5, `${z0.toFixed(2)} -> ${map.getZoom().toFixed(2)}`);
+  map.zoomBy(1 / 4096);
+  check('zoom stops at the minimum', Math.abs(map.getZoom() - 10) < 1e-6, map.getZoom().toFixed(2));
+
+  // back to the island, click a labelled feature
+  map.setView(-64.2935, 44.5135, 15.8);
+  await until(() => map.last && map.last.symbols.length > 0);
+  const target = map.last.symbols.find((s) => s.item.name === 'Money Pit') || map.last.symbols.find((s) => s.item.name);
+  fire('pointerdown', target.x, target.y); fire('pointerup', target.x, target.y);
+  check('click selects the feature under the cursor', selected && selected.item && selected.item.name === target.item.name, selected && selected.item && selected.item.name);
+  const pop = document.querySelector('.tm-popup');
+  check('popup shows the feature', pop && !pop.hidden && pop.textContent.includes(target.item.name), pop && pop.textContent.slice(0, 60));
+
+  // click on open water selects nothing and closes the popup
+  map.setView(-64.27, 44.505, 15.8); await wait(50);
+  const sea = [map.w * 0.7, map.h * 0.72];
+  fire('pointerdown', ...sea); fire('pointerup', ...sea);
+  check('click on open water selects nothing', selected && selected.item === null, selected && selected.item && selected.item.name);
+
+  // two-finger pinch zooms out
+  map.setView(-64.2935, 44.5135, 15.8);
+  const zp = map.getZoom();
+  const T = (type, id, x, y) => fire(type, x, y, { id, pointerType: 'touch', isPrimary: id === 1 });
+  T('pointerdown', 1, 500, 450); T('pointerdown', 2, 900, 450);
+  for (let i = 1; i <= 8; i++) { T('pointermove', 1, 500 + i * 20, 450); T('pointermove', 2, 900 - i * 20, 450); }
+  T('pointerup', 1, 660, 450); T('pointerup', 2, 740, 450);
+  check('pinch zooms out', map.getZoom() < zp - 1, `${zp.toFixed(2)} -> ${map.getZoom().toFixed(2)}`);
+
+  check('no script errors', errors.length === 0, errors.join(' | '));
+  check('loader is idle and error-free', lastStatus && !lastStatus.error, lastStatus && JSON.stringify(lastStatus));
+} catch (err) {
+  results.push('FAIL  threw: ' + (err.stack || err));
+}
+out.textContent = results.join('\n');
+document.title = results.some((l) => l.startsWith('FAIL')) ? 'FAIL' : 'PASS';
+</script>
+</body>
+</html>
