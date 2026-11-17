@@ -1,0 +1,1163 @@
+<title>Paces to the Gold</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Pirata+One&display=swap">
+<style>
+/* Layout: a chart laid on a dark sea-green chart table; the chart fills the left, the captain's log runs down the right (stacks under the chart on phones). Single deliberate night-cabin look. */
+:root {
+  --table: #0f1d1c;
+  --table-2: #162826;
+  --rule: #2c4340;
+  --parch: #ecdcb6;
+  --parch-dim: #b3a685;
+  --paper: #e8d4a4;
+  --ink: #2a190b;
+  --seal: #c0392b;
+  --brass: #d4ac55;
+  --font-display: "Pirata One", "Luminari", fantasy;
+  --font-body: "IM Fell English", "Iowan Old Style", Georgia, serif;
+  --font-sc: "IM Fell English SC", "IM Fell English", Georgia, serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body {
+  background: var(--table);
+  color: var(--parch);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+}
+*, *::before, *::after { box-sizing: border-box; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+.app { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; padding-block: 12px; }
+
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.brand-name { font-family: var(--font-display); font-size: 34px; line-height: 1; color: var(--brass); letter-spacing: 0.01em; }
+.brand-tag { font-style: italic; color: var(--parch-dim); font-size: 15px; }
+.charts { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; }
+.chart-tab {
+  background: transparent; border: 1px solid var(--rule); border-radius: 3px;
+  padding: 5px 12px 6px; cursor: pointer; text-align: left; display: grid; line-height: 1.15;
+}
+.chart-tab small { font-family: var(--font-sc); font-size: 12px; letter-spacing: 0.08em; color: var(--parch-dim); }
+.chart-tab span { font-size: 17px; }
+.chart-tab:hover { border-color: var(--parch-dim); }
+.chart-tab[aria-selected="true"] { border-color: var(--brass); background: var(--table-2); }
+.chart-tab[aria-selected="true"] span { color: var(--brass); }
+.purse { font-family: var(--font-sc); letter-spacing: 0.06em; font-size: 15px; color: var(--parch-dim); white-space: nowrap; }
+.purse b { color: var(--brass); font-weight: normal; font-family: var(--font-body); font-size: 19px; font-variant-numeric: tabular-nums; }
+
+.deck { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; min-height: 0; }
+
+.chart-wrap { position: relative; min-height: 0; border-radius: 4px; overflow: hidden; background: var(--table); }
+#chart { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+#chart.measuring { cursor: copy; }
+#chart.panning { cursor: grabbing; }
+
+.tools {
+  position: absolute; left: 10px; top: 10px; display: flex; flex-direction: column; gap: 8px;
+}
+.seg { display: flex; flex-direction: column; background: rgba(15, 29, 28, 0.86); border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+.tool {
+  background: transparent; border: 0; width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer; color: var(--parch);
+}
+.tool + .tool { border-top: 1px solid var(--rule); }
+.tool:hover { background: var(--table-2); }
+.tool[aria-pressed="true"] { background: var(--brass); color: var(--ink); }
+.tool svg { width: 24px; height: 24px; }
+.readout {
+  position: absolute; right: 10px; bottom: 10px; padding: 4px 10px; border-radius: 3px;
+  background: rgba(15, 29, 28, 0.86); border: 1px solid var(--rule);
+  font-size: 14px; font-variant-numeric: tabular-nums; color: var(--parch); pointer-events: none;
+}
+.mode-hint {
+  position: absolute; left: 64px; top: 10px; padding: 6px 12px; border-radius: 3px; max-width: calc(100% - 80px);
+  background: rgba(15, 29, 28, 0.86); border: 1px solid var(--rule); font-style: italic; font-size: 15px; pointer-events: none;
+}
+.loading {
+  position: absolute; inset: 0; display: grid; place-items: center; font-style: italic; font-size: 20px; color: var(--parch-dim);
+  background: var(--table);
+}
+
+.log { display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow-y: auto; padding-right: 2px; }
+.isle-head h1 { font-family: var(--font-display); font-weight: normal; font-size: 40px; line-height: 1; margin: 0; color: var(--parch); text-wrap: balance; }
+.isle-head .region { font-family: var(--font-sc); letter-spacing: 0.1em; font-size: 13px; color: var(--brass); margin: 4px 0 8px; }
+.isle-head p { margin: 0; color: var(--parch-dim); font-size: 16px; }
+
+.orders {
+  position: relative; color: var(--ink); padding: 18px 20px 16px; border-radius: 2px;
+  background:
+    radial-gradient(120% 90% at 30% 20%, rgba(255, 246, 220, 0.55), rgba(255, 246, 220, 0) 60%),
+    radial-gradient(80% 60% at 90% 100%, rgba(120, 70, 20, 0.22), rgba(120, 70, 20, 0) 70%),
+    var(--paper);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.orders .label { min-height: 36px; padding-right: 52px; font-family: var(--font-sc); letter-spacing: 0.12em; font-size: 13px; color: #7a3b1d; margin: 0 0 6px; }
+.orders .clue { font-style: italic; font-size: 20px; line-height: 1.35; margin: 0; text-wrap: pretty; }
+.orders .clue b { font-style: normal; font-weight: normal; border-bottom: 1px solid rgba(42, 25, 11, 0.5); }
+.orders .fine { font-size: 14px; margin: 10px 0 0; color: #5a3a1c; }
+.seal {
+  position: absolute; right: 14px; top: 12px; width: 40px; height: 40px; border-radius: 50%;
+  background: radial-gradient(circle at 38% 35%, #d9534a, var(--seal) 55%, #7e1f16);
+  display: grid; place-items: center; color: #f5d6c8; font-family: var(--font-display); font-size: 20px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+}
+
+.digs { display: flex; align-items: center; gap: 12px; }
+.digs .label { font-family: var(--font-sc); letter-spacing: 0.1em; font-size: 13px; color: var(--parch-dim); }
+.pips { display: flex; gap: 6px; }
+.pip { width: 22px; height: 22px; color: var(--brass); }
+.pip.spent { color: var(--rule); }
+
+.parrot { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.parrot li { border-left: 2px solid var(--rule); padding: 2px 0 2px 12px; font-size: 16px; }
+.parrot li .who { font-family: var(--font-sc); letter-spacing: 0.08em; font-size: 12px; color: var(--parch-dim); display: block; }
+.parrot li.hot { border-left-color: var(--seal); }
+.parrot li.win { border-left-color: var(--brass); }
+.parrot li.win .msg { color: var(--brass); }
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  border: 1px solid var(--brass); background: transparent; color: var(--brass); padding: 9px 16px; border-radius: 3px; cursor: pointer;
+  font-family: var(--font-sc); letter-spacing: 0.08em; font-size: 15px;
+}
+.btn:hover { background: var(--brass); color: var(--ink); }
+.btn.primary { background: var(--brass); color: var(--ink); }
+.btn.primary:hover { background: var(--parch); border-color: var(--parch); }
+
+.credit { font-size: 13px; color: var(--parch-dim); margin: auto 0 0; padding-top: 8px; border-top: 1px solid var(--rule); }
+.credit a { color: var(--parch); }
+
+@media (max-width: 860px) {
+  html, body { height: auto; }
+  .app { height: auto; }
+  .deck { grid-template-columns: minmax(0, 1fr); }
+  .chart-wrap { height: 64vh; min-height: 340px; }
+  .log { overflow: visible; }
+  .brand-name { font-size: 28px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="app">
+  <header class="bar">
+    <div class="brand"><span class="brand-name">Paces to the Gold</span><span class="brand-tag">Treasure hunts on real island charts</span></div>
+    <nav class="charts" id="tabs" role="tablist" aria-label="Choose an island chart"></nav>
+    <div class="purse" aria-live="polite">Chests <b id="purse-chests">0</b> &middot; Doubloons <b id="purse-gold">0</b></div>
+  </header>
+  <main class="deck">
+    <section class="chart-wrap" id="wrap" aria-label="Treasure chart">
+      <canvas id="chart"></canvas>
+      <div class="tools">
+        <div class="seg" role="group" aria-label="Tool">
+          <button class="tool" id="t-dig" aria-pressed="true" title="Spade: tap the chart to dig (D)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6"/><path d="M17 7l-6.5 6.5"/><path d="M10.5 13.5l-4.8 1.1a1 1 0 0 0-.6.4L3.5 18a1.4 1.4 0 0 0 1.9 1.9l3-1.6a1 1 0 0 0 .4-.6l1.1-4.8z"/></svg>
+          </button>
+          <button class="tool" id="t-measure" aria-pressed="false" title="Dividers: drag to measure paces and bearing (M)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4.5" r="1.6"/><path d="M11 6L5 21"/><path d="M13 6l6 15"/><path d="M8 13.5h8"/></svg>
+          </button>
+        </div>
+        <div class="seg" role="group" aria-label="Zoom">
+          <button class="tool" id="z-in" title="Zoom in (+)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg></button>
+          <button class="tool" id="z-out" title="Zoom out (−)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
+          <button class="tool" id="z-fit" title="Whole chart (0)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+        </div>
+      </div>
+      <div class="mode-hint" id="hint">Tap land to dig.</div>
+      <div class="readout" id="readout" hidden></div>
+      <div class="loading" id="loading">Inking the chart&hellip;</div>
+    </section>
+    <aside class="log" aria-label="Captain's log">
+      <div class="isle-head">
+        <h1 id="isle-name">Oak Island</h1>
+        <div class="region" id="isle-region">Nova Scotia</div>
+        <p id="isle-blurb"></p>
+      </div>
+      <div class="orders">
+        <div class="seal" aria-hidden="true">X</div>
+        <p class="label">The captain&rsquo;s orders</p>
+        <p class="clue" id="clue"></p>
+        <p class="fine" id="clue-fine"></p>
+      </div>
+      <div class="digs"><span class="label">Digs left</span><div class="pips" id="pips"></div></div>
+      <ol class="parrot" id="parrot" aria-live="polite"></ol>
+      <div class="actions">
+        <button class="btn" id="newHunt">Bury a new chest</button>
+      </div>
+      <p class="credit">Map data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, ODbL. Extracted through the Overpass API in November 2026. One pace is five feet (1.524&nbsp;m). Bearings are true.</p>
+    </aside>
+  </main>
+</div>
+
+<script id="maps" type="application/json">/*MAPS*/</script>
+<script>
+(() => {
+'use strict';
+const MAPS = JSON.parse(document.getElementById('maps').textContent);
+const ORDER = ['oak', 'gardiners', 'norman', 'cocos'];
+const INFO = {
+  oak: { name: 'Oak Island', region: 'Mahone Bay, Nova Scotia', short: 'Nova Scotia',
+    blurb: 'Treasure hunters have been digging at the Money Pit since 1795. Shafts, flood tunnels and a television series later, the fortune has never been found.' },
+  gardiners: { name: 'Gardiners Island', region: 'Long Island, New York', short: 'New York',
+    blurb: 'In 1699 Captain William Kidd buried gold, silver and jewels here. The cache was dug up and shipped to England as evidence at his trial. Some say he left more behind.' },
+  norman: { name: 'Norman Island', region: 'British Virgin Islands', short: 'Virgin Islands',
+    blurb: 'In 1750 mutineers from the Spanish galleon Nuestra Señora de Guadalupe hid her silver on this island. Its legend is often linked to Stevenson’s Treasure Island.' },
+  cocos: { name: 'Cocos Island', region: 'Isla del Coco, Costa Rica', short: 'Costa Rica',
+    blurb: 'Legend says the Treasure of Lima was buried here in 1820. Hundreds of expeditions have searched for it since, and none has come home rich.' },
+};
+const PACE = 1.524;
+const BASE = 2400, PAD = 132, BAND = 26;
+const INK = '#2a190b';
+const FONT = '"IM Fell English", Georgia, serif';
+const FONT_SC = '"IM Fell English SC", "IM Fell English", Georgia, serif';
+const FONT_D = '"Pirata One", Georgia, serif';
+const POINTS32 = ['North', 'North by east', 'Nor’-nor’east', 'Nor’east by north', 'Nor’east', 'Nor’east by east', 'East-nor’east', 'East by north',
+  'East', 'East by south', 'East-sou’east', 'Sou’east by east', 'Sou’east', 'Sou’east by south', 'Sou’-sou’east', 'South by east',
+  'South', 'South by west', 'Sou’-sou’west', 'Sou’west by south', 'Sou’west', 'Sou’west by west', 'West-sou’west', 'West by south',
+  'West', 'West by north', 'West-nor’west', 'Nor’west by west', 'Nor’west', 'Nor’west by north', 'Nor’-nor’west', 'North by west'];
+const POINTS8 = ['north', 'nor’east', 'east', 'sou’east', 'south', 'sou’west', 'west', 'nor’west'];
+const CLUE_KINDS = new Set(['peak', 'cape', 'poi', 'place', 'rock', 'isle']);
+
+// ---------- helpers ----------
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hashStr(s) { let h = 2166136261; for (const ch of s) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function degFrac(d) {
+  const whole = Math.floor(d + 1e-9), f = d - whole;
+  const fr = Math.abs(f) < 0.01 ? '' : Math.abs(f - 0.25) < 0.01 ? '¼' : Math.abs(f - 0.5) < 0.01 ? '½' : Math.abs(f - 0.75) < 0.01 ? '¾' : '';
+  return whole + fr + '°';
+}
+function bearingOf(x1, y1, x2, y2) { return (Math.atan2(x2 - x1, -(y2 - y1)) * 180 / Math.PI + 360) % 360; }
+function fmtPaces(n) { return Math.round(n).toLocaleString('en-US'); }
+function dms(v, pos, neg) {
+  const h = v >= 0 ? pos : neg; v = Math.abs(v);
+  const d = Math.floor(v), mf = (v - d) * 60, m = Math.floor(mf), s = Math.round((mf - m) * 60);
+  return `${d}°${String(m).padStart(2, '0')}′${String(s === 60 ? 59 : s).padStart(2, '0')}″${h}`;
+}
+
+function ringsPath(rings, close = true) {
+  const p = new Path2D();
+  for (const r of rings) {
+    r.forEach((pt, i) => (i ? p.lineTo(pt[0], pt[1]) : p.moveTo(pt[0], pt[1])));
+    if (close) p.closePath();
+  }
+  return p;
+}
+function wobbleRing(pts, rnd, amp) {
+  // resample at ~6px and push along normal with smooth noise for a hand-inked edge
+  const out = []; const a = rnd() * 100, b = rnd() * 100; let t = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x1, y1] = pts[i], [x2, y2] = pts[i + 1];
+    const L = Math.hypot(x2 - x1, y2 - y1); if (L === 0) continue;
+    const nx = -(y2 - y1) / L, ny = (x2 - x1) / L;
+    const n = Math.max(1, Math.round(L / 6));
+    for (let k = 0; k < n; k++) {
+      const f = k / n; const tt = t + L * f;
+      const off = amp * (Math.sin(tt * 0.083 + a) * 0.65 + Math.sin(tt * 0.29 + b) * 0.35);
+      out.push([x1 + (x2 - x1) * f + nx * off, y1 + (y2 - y1) * f + ny * off]);
+    }
+    t += L;
+  }
+  if (out.length) out.push(out[0].slice());
+  return out;
+}
+
+function spacedText(c, text, x, y, spacing, align = 'center') {
+  const chars = [...text];
+  const widths = chars.map(ch => c.measureText(ch).width);
+  const total = widths.reduce((s, w) => s + w, 0) + spacing * (chars.length - 1);
+  let cx = align === 'center' ? x - total / 2 : align === 'right' ? x - total : x;
+  const prev = c.textAlign; c.textAlign = 'left';
+  chars.forEach((ch, i) => { c.fillText(ch, cx, y); cx += widths[i] + spacing; });
+  c.textAlign = prev;
+  return total;
+}
+function spacedWidth(c, text, spacing) { const chars = [...text]; return chars.reduce((s, ch) => s + c.measureText(ch).width, 0) + spacing * (chars.length - 1); }
+
+// ---------- chart rendering ----------
+function paintParchment(c, W, H, rnd) {
+  c.fillStyle = '#e7d09f'; c.fillRect(0, 0, W, H);
+  for (let i = 0; i < 70; i++) {
+    const x = rnd() * W, y = rnd() * H, r = 120 + rnd() * 520;
+    const g = c.createRadialGradient(x, y, 0, x, y, r);
+    const dark = rnd() < 0.62;
+    const a = dark ? 0.03 + rnd() * 0.06 : 0.05 + rnd() * 0.08;
+    g.addColorStop(0, dark ? `rgba(140,90,35,${a})` : `rgba(255,246,218,${a})`);
+    g.addColorStop(1, dark ? 'rgba(140,90,35,0)' : 'rgba(255,246,218,0)');
+    c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  // fibres
+  c.lineCap = 'round';
+  for (let i = 0; i < 420; i++) {
+    const x = rnd() * W, y = rnd() * H, L = 20 + rnd() * 90, ang = rnd() * Math.PI;
+    c.strokeStyle = rnd() < 0.5 ? 'rgba(120,80,30,0.07)' : 'rgba(255,250,230,0.10)';
+    c.lineWidth = 0.6 + rnd() * 1.2;
+    c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + Math.cos(ang) * L * 0.5 + (rnd() - 0.5) * 12, y + Math.sin(ang) * L * 0.5 + (rnd() - 0.5) * 12, x + Math.cos(ang) * L, y + Math.sin(ang) * L); c.stroke();
+  }
+  // grain
+  const id = c.getImageData(0, 0, W, H), d = id.data;
+  let seed = (rnd() * 4294967296) >>> 0;
+  for (let i = 0; i < d.length; i += 4) {
+    seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+    const n = ((seed >>> 0) / 4294967296 - 0.5) * 20;
+    d[i] = clamp(d[i] + n, 0, 255); d[i + 1] = clamp(d[i + 1] + n * 0.92, 0, 255); d[i + 2] = clamp(d[i + 2] + n * 0.8, 0, 255);
+  }
+  c.putImageData(id, 0, 0);
+}
+
+function drawTree(c, x, y, r, rnd) {
+  c.strokeStyle = INK; c.lineWidth = 1.5;
+  c.beginPath(); c.moveTo(x, y + r * 0.5); c.lineTo(x, y + r * 1.45); c.stroke();
+  c.beginPath();
+  const n = 7, ph = rnd() * 6;
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2 + ph;
+    const rr = r * (0.95 + 0.12 * Math.sin(i * 2.7 + ph));
+    const px = x + Math.cos(a) * rr, py = y - r * 0.15 + Math.sin(a) * rr * 0.9;
+    if (i === 0) c.moveTo(px, py); else {
+      const am = a - Math.PI / n, rm = rr * 1.18;
+      c.quadraticCurveTo(x + Math.cos(am) * rm, y - r * 0.15 + Math.sin(am) * rm * 0.9, px, py);
+    }
+  }
+  c.closePath();
+  c.fillStyle = 'rgba(214,186,128,0.96)'; c.fill(); c.stroke();
+  c.lineWidth = 1.1; c.strokeStyle = 'rgba(42,25,11,0.7)';
+  for (let k = 0; k < 3; k++) {
+    const ox = x + r * (0.15 + k * 0.22), oy = y + r * (0.05 + k * 0.08);
+    c.beginPath(); c.moveTo(ox, oy - r * 0.35); c.lineTo(ox - r * 0.2, oy + r * 0.3); c.stroke();
+  }
+}
+function drawTuft(c, x, y, r) {
+  c.strokeStyle = 'rgba(42,25,11,0.75)'; c.lineWidth = 1.3;
+  c.beginPath();
+  c.moveTo(x - r, y); c.quadraticCurveTo(x - r * 0.8, y - r * 0.8, x - r * 0.3, y - r * 1.1);
+  c.moveTo(x, y); c.lineTo(x, y - r * 1.3);
+  c.moveTo(x + r, y); c.quadraticCurveTo(x + r * 0.8, y - r * 0.8, x + r * 0.3, y - r * 1.1);
+  c.stroke();
+}
+function drawMarsh(c, x, y, r) {
+  c.strokeStyle = 'rgba(42,25,11,0.7)'; c.lineWidth = 1.2;
+  c.beginPath(); c.moveTo(x - r * 1.3, y); c.lineTo(x + r * 1.3, y);
+  for (const dx of [-0.6, 0, 0.6]) { c.moveTo(x + dx * r, y); c.lineTo(x + dx * r * 1.2, y - r * (dx === 0 ? 1.2 : 0.8)); }
+  c.stroke();
+}
+function drawPeak(c, x, y, sz) {
+  const w = sz, h = sz * 0.8;
+  c.beginPath(); c.moveTo(x - w, y); c.lineTo(x - w * 0.1, y - h); c.lineTo(x + w * 0.15, y - h * 0.82); c.lineTo(x + w, y);
+  c.fillStyle = 'rgba(222,196,140,0.95)'; c.fill();
+  c.strokeStyle = INK; c.lineWidth = 2; c.stroke();
+  c.lineWidth = 1.1;
+  for (let k = 1; k < 6; k++) {
+    const f = k / 6; const tx = x - w * 0.1 + (w * 1.1) * f, ty = y - h + h * f;
+    c.beginPath(); c.moveTo(tx - 1, ty + 2); c.lineTo(tx - w * 0.25, y - 1); c.stroke();
+  }
+}
+function drawMarker(c, x, y) {
+  c.strokeStyle = INK; c.lineWidth = 2;
+  c.beginPath(); c.arc(x, y, 7, 0, Math.PI * 2); c.stroke();
+  c.fillStyle = INK; c.beginPath(); c.arc(x, y, 2.4, 0, Math.PI * 2); c.fill();
+}
+function drawWave(c, x, y, sz) {
+  c.beginPath();
+  c.moveTo(x - sz, y);
+  c.quadraticCurveTo(x - sz * 0.5, y - sz * 0.55, x, y);
+  c.quadraticCurveTo(x + sz * 0.5, y + sz * 0.55, x + sz, y);
+  c.stroke();
+}
+function drawSerpent(c, x, y, k) {
+  c.save(); c.translate(x, y); c.scale(k, k);
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  const body = (draw) => {
+    for (let i = 0; i < 3; i++) { const cx = 10 + i * 46; c.beginPath(); c.arc(cx, 0, 17 - i * 2, Math.PI, 0); draw(); }
+    c.beginPath(); c.moveTo(-14, 0); c.bezierCurveTo(-18, -30, -10, -52, -30, -62); draw();
+  };
+  c.strokeStyle = INK; c.lineWidth = 12; body(() => c.stroke());
+  c.strokeStyle = '#dcc28c'; c.lineWidth = 8; body(() => c.stroke());
+  c.strokeStyle = 'rgba(42,25,11,0.6)'; c.lineWidth = 1.2;
+  for (let i = 0; i < 3; i++) { const cx = 10 + i * 46, r = 17 - i * 2; for (let a = 0.3; a < 2.9; a += 0.45) { c.beginPath(); c.moveTo(cx - Math.cos(a) * (r - 3), -Math.sin(a) * (r - 3)); c.lineTo(cx - Math.cos(a) * (r + 3), -Math.sin(a) * (r + 3)); c.stroke(); } }
+  // head
+  c.beginPath(); c.moveTo(-26, -70); c.quadraticCurveTo(-48, -78, -62, -66); c.lineTo(-50, -62); c.quadraticCurveTo(-40, -58, -34, -56); c.closePath();
+  c.fillStyle = '#dcc28c'; c.fill(); c.strokeStyle = INK; c.lineWidth = 2.2; c.stroke();
+  c.fillStyle = INK; c.beginPath(); c.arc(-40, -68, 2.6, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.moveTo(-60, -64); c.lineTo(-72, -60); c.moveTo(-60, -64); c.lineTo(-71, -66); c.lineWidth = 1.4; c.stroke();
+  // tail fin
+  c.beginPath(); c.moveTo(118, 0); c.quadraticCurveTo(132, -6, 140, -22); c.quadraticCurveTo(136, -6, 150, -4); c.quadraticCurveTo(136, 0, 118, 0);
+  c.fillStyle = '#dcc28c'; c.fill(); c.lineWidth = 2; c.stroke();
+  c.strokeStyle = 'rgba(42,25,11,0.55)'; c.lineWidth = 1.5;
+  for (let i = -1; i < 4; i++) drawWave(c, i * 40 + 20, 10, 14);
+  c.restore();
+}
+function drawRose(c, x, y, R) {
+  c.save();
+  c.fillStyle = 'rgba(232,212,164,0.75)';
+  c.beginPath(); c.arc(x, y, R * 1.02, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = INK; c.lineWidth = 2.4; c.beginPath(); c.arc(x, y, R, 0, Math.PI * 2); c.stroke();
+  c.lineWidth = 1.2; c.beginPath(); c.arc(x, y, R * 0.9, 0, Math.PI * 2); c.stroke();
+  for (let i = 0; i < 128; i++) {
+    const a = i / 128 * Math.PI * 2, r1 = R * 0.9, r2 = i % 4 === 0 ? R : R * 0.95;
+    c.lineWidth = i % 16 === 0 ? 2 : 0.9;
+    c.beginPath(); c.moveTo(x + Math.sin(a) * r1, y - Math.cos(a) * r1); c.lineTo(x + Math.sin(a) * r2, y - Math.cos(a) * r2); c.stroke();
+  }
+  c.lineWidth = 1; c.beginPath(); c.arc(x, y, R * 0.42, 0, Math.PI * 2); c.stroke();
+  const order = [];
+  for (let i = 0; i < 32; i++) order.push(i);
+  order.sort((a, b) => rank(a) - rank(b));
+  function rank(i) { return i % 8 === 0 ? 3 : i % 4 === 0 ? 2 : i % 2 === 0 ? 1 : 0; }
+  for (const i of order) {
+    const rk = rank(i);
+    const L = [R * 0.5, R * 0.62, R * 0.74, R * 0.88][rk];
+    const hw = [R * 0.045, R * 0.06, R * 0.08, R * 0.11][rk];
+    const a = i * 11.25 * Math.PI / 180;
+    const tx = x + Math.sin(a) * L, ty = y - Math.cos(a) * L;
+    const lx = x + Math.sin(a - Math.PI / 2) * hw, ly = y - Math.cos(a - Math.PI / 2) * hw;
+    const rx = x + Math.sin(a + Math.PI / 2) * hw, ry = y - Math.cos(a + Math.PI / 2) * hw;
+    c.lineWidth = 1.3; c.strokeStyle = INK;
+    c.beginPath(); c.moveTo(x, y); c.lineTo(lx, ly); c.lineTo(tx, ty); c.closePath();
+    c.fillStyle = rk >= 2 ? INK : '#6b4a26'; c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(x, y); c.lineTo(rx, ry); c.lineTo(tx, ty); c.closePath();
+    c.fillStyle = '#ead7a8'; c.fill(); c.stroke();
+  }
+  c.fillStyle = '#ead7a8'; c.beginPath(); c.arc(x, y, R * 0.06, 0, Math.PI * 2); c.fill(); c.stroke();
+  c.fillStyle = INK; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = `${Math.round(R * 0.36)}px ${FONT_D}`;
+  c.fillText('N', x, y - R * 1.2);
+  c.font = `${Math.round(R * 0.2)}px ${FONT_SC}`;
+  c.fillText('E', x + R * 1.13, y); c.fillText('S', x, y + R * 1.14); c.fillText('W', x - R * 1.15, y);
+  c.restore();
+}
+
+function niceStep(v) { const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p; return 10 * p; }
+
+function buildChart(key) {
+  const m = MAPS[key]; const info = INFO[key];
+  const rnd = mulberry32(hashStr(key));
+  const D = Math.max(m.w, m.h); const s = BASE / D;
+  const iw = m.w * s, ih = m.h * s;
+  const W = Math.round(iw + PAD * 2), H = Math.round(ih + PAD * 2);
+  const cv = mk(W, H), c = cv.getContext('2d');
+  const X = v => PAD + v * s, Y = v => PAD + v * s;
+  const tr = r => r.map(p => [X(p[0]), Y(p[1])]);
+
+  paintParchment(c, W, H, rnd);
+  const paper = mk(W, H); paper.getContext('2d').drawImage(cv, 0, 0);
+
+  const landRings = m.land.map(r => wobbleRing(tr(r), rnd, 1.3));
+  const landPath = ringsPath(landRings);
+  const lakeRings = m.water.map(r => wobbleRing(tr(r), rnd, 0.8));
+  const lakePath = ringsPath(lakeRings);
+  const isLand = (x, y) => c.isPointInPath(landPath, x, y);
+  const nearLand = (x, y, r) => { if (isLand(x, y)) return true; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; if (isLand(x + Math.cos(a) * r, y + Math.sin(a) * r)) return true; } return false; };
+  const landFrac = (x0, y0, w, h) => { let n = 0, t = 0; for (let i = 0; i <= 10; i++) for (let j = 0; j <= 10; j++) { t++; if (isLand(x0 + w * i / 10, y0 + h * j / 10)) n++; } return n / t; };
+  const overlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+  // ---- layout: compass rose, cartouche ----
+  const occ = [];
+  const R = clamp(Math.min(iw, ih) * 0.11, 120, 190);
+  const roseCands = [[0.15, 0.82], [0.85, 0.18], [0.85, 0.82], [0.15, 0.18], [0.5, 0.86], [0.5, 0.14], [0.12, 0.5], [0.88, 0.5]];
+  let best = null;
+  for (const [fx, fy] of roseCands) {
+    const x = PAD + iw * fx, y = PAD + ih * fy;
+    const sc = landFrac(x - R * 1.3, y - R * 1.4, R * 2.6, R * 2.7);
+    if (!best || sc < best.sc - 0.01) best = { x, y, sc };
+  }
+  const rose = best;
+  const roseBox = { x: rose.x - R * 1.35, y: rose.y - R * 1.45, w: R * 2.7, h: R * 2.75 };
+  occ.push(roseBox);
+
+  const cw = clamp(iw * 0.4, 520, 700), chh = cw * 0.42;
+  const cartCands = [[PAD + 34, PAD + 34], [PAD + iw - cw - 34, PAD + 34], [PAD + 34, PAD + ih - chh - 34], [PAD + iw - cw - 34, PAD + ih - chh - 34]];
+  best = null;
+  for (const [x, y] of cartCands) {
+    const box = { x, y, w: cw, h: chh };
+    const sc = landFrac(x, y, cw, chh) + (overlap(box, roseBox) ? 5 : 0);
+    if (!best || sc < best.sc - 0.01) best = { ...box, sc };
+  }
+  const cart = best; occ.push(cart);
+
+  // ---- labels (placed before drawing so other decoration can avoid them) ----
+  const labelStyle = {
+    bay: { font: `italic 38px ${FONT}`, sp: 5, color: 'rgba(42,25,11,0.78)', center: true },
+    shoal: { font: `italic 30px ${FONT}`, sp: 3, color: 'rgba(42,25,11,0.7)', center: true },
+    lake: { font: `italic 28px ${FONT}`, sp: 2, color: 'rgba(42,25,11,0.85)', center: true },
+    river: { font: `italic 28px ${FONT}`, sp: 1, color: 'rgba(42,25,11,0.85)', center: true },
+    isle: { font: `34px ${FONT_SC}`, sp: 2, color: INK },
+    place: { font: `36px ${FONT_SC}`, sp: 2, color: INK },
+    peak: { font: `italic 34px ${FONT}`, sp: 1, color: INK },
+    cape: { font: `italic 32px ${FONT}`, sp: 1, color: INK },
+    rock: { font: `italic 30px ${FONT}`, sp: 1, color: INK },
+    poi: { font: `32px ${FONT}`, sp: 1, color: INK },
+  };
+  const prio = { peak: 0, poi: 1, cape: 2, place: 2, isle: 3, rock: 4, bay: 5, lake: 6, shoal: 7, river: 8 };
+  const labels = m.labels.slice().sort((a, b) => (prio[a.k] ?? 9) - (prio[b.k] ?? 9));
+  const placed = [];
+  const inFrame = b => b.x > PAD + 6 && b.y > PAD + 6 && b.x + b.w < PAD + iw - 6 && b.y + b.h < PAD + ih - 6;
+  for (const L of labels) {
+    const st = labelStyle[L.k] || labelStyle.poi;
+    c.font = st.font;
+    let lines = [L.n];
+    if (L.n.length > 16 && L.n.includes(' ')) {
+      const words = L.n.split(' '); let bestSplit = 1, bestDiff = 1e9;
+      for (let i = 1; i < words.length; i++) { const a = words.slice(0, i).join(' '), b = words.slice(i).join(' '); const dd = Math.abs(a.length - b.length); if (dd < bestDiff) { bestDiff = dd; bestSplit = i; } }
+      lines = [words.slice(0, bestSplit).join(' '), words.slice(bestSplit).join(' ')];
+    }
+    const fs = parseInt(st.font.match(/(\d+)px/)[1], 10);
+    const lh = fs * 1.05;
+    const tw = Math.max(...lines.map(t => spacedWidth(c, t, st.sp)));
+    const th = lh * lines.length;
+    const px = X(L.x), py = Y(L.y);
+    const marker = CLUE_KINDS.has(L.k);
+    const g = marker ? 16 : 0;
+    const cands = st.center
+      ? [[px - tw / 2, py - th / 2], [px - tw / 2, py - th / 2 - 46], [px - tw / 2, py + 46 - th / 2], [px - tw / 2 + 60, py - th / 2], [px - tw / 2 - 60, py - th / 2]]
+      : [[px + g, py - th / 2], [px - g - tw, py - th / 2], [px - tw / 2, py - g - th - (L.k === 'peak' ? 30 : 0)], [px - tw / 2, py + g], [px + g, py - g - th + 6], [px - g - tw, py + g - 6], [px + g, py + g - 6], [px - g - tw, py - g - th + 6]];
+    let ok = null;
+    for (const [bx, by] of cands) {
+      const box = { x: bx - 4, y: by - 4, w: tw + 8, h: th + 8 };
+      if (!inFrame(box)) continue;
+      if (occ.some(o => overlap(o, box))) continue;
+      ok = { box, bx, by }; break;
+    }
+    if (!ok) continue;
+    occ.push(ok.box);
+    if (marker) occ.push({ x: px - 10, y: py - (L.k === 'peak' ? 40 : 10), w: 20, h: L.k === 'peak' ? 50 : 20 });
+    placed.push({ ...L, lines, st, lh, tw, bx: ok.bx, by: ok.by, px, py, marker });
+  }
+
+  // ---- sea ----
+  c.save();
+  c.beginPath(); c.rect(PAD, PAD, iw, ih); c.clip();
+  c.globalCompositeOperation = 'multiply';
+  c.fillStyle = 'rgba(190,204,188,0.6)'; c.fillRect(PAD, PAD, iw, ih);
+  c.globalCompositeOperation = 'source-over';
+  // rhumb lines
+  const diag = Math.hypot(W, H);
+  for (let i = 0; i < 32; i++) {
+    const a = i * 11.25 * Math.PI / 180;
+    c.strokeStyle = i % 4 === 0 ? 'rgba(60,35,15,0.24)' : 'rgba(60,35,15,0.13)';
+    c.lineWidth = i % 4 === 0 ? 1.6 : 1.1;
+    c.beginPath(); c.moveTo(rose.x, rose.y); c.lineTo(rose.x + Math.sin(a) * diag, rose.y - Math.cos(a) * diag); c.stroke();
+  }
+  // coastal ripple lines (offset outlines)
+  const rip = mk(W, H), rc = rip.getContext('2d');
+  rc.lineJoin = 'round'; rc.lineCap = 'round';
+  const ripples = [[54, 0.16], [38, 0.24], [24, 0.34], [12, 0.46]];
+  for (const [d, a] of ripples) {
+    rc.globalCompositeOperation = 'source-over'; rc.strokeStyle = `rgba(42,25,11,${a})`; rc.lineWidth = d * 2 + 1.8; rc.stroke(landPath);
+    rc.globalCompositeOperation = 'destination-out'; rc.lineWidth = d * 2 - 1.8; rc.stroke(landPath);
+  }
+  c.drawImage(rip, 0, 0);
+  // little waves in open water
+  c.strokeStyle = 'rgba(42,25,11,0.42)'; c.lineWidth = 1.7; c.lineCap = 'round';
+  const step = 78;
+  for (let gy = PAD + 30; gy < PAD + ih - 20; gy += step * 0.8) {
+    for (let gx = PAD + 30; gx < PAD + iw - 20; gx += step) {
+      if (rnd() < 0.35) continue;
+      const x = gx + (rnd() - 0.5) * step * 0.7, y = gy + (rnd() - 0.5) * step * 0.5;
+      const box = { x: x - 22, y: y - 10, w: 44, h: 20 };
+      if (occ.some(o => overlap(o, box))) continue;
+      if (nearLand(x, y, 66)) continue;
+      drawWave(c, x - 9, y, 9); drawWave(c, x + 9, y, 9);
+    }
+  }
+  // sea serpent in the widest stretch of open water
+  let sp = null;
+  for (let t = 0; t < 260; t++) {
+    const x = PAD + 120 + rnd() * (iw - 320), y = PAD + 150 + rnd() * (ih - 220);
+    const box = { x: x - 90, y: y - 100, w: 270, h: 150 };
+    if (occ.some(o => overlap(o, box))) continue;
+    if (landFrac(box.x - 40, box.y - 40, box.w + 80, box.h + 80) > 0) continue;
+    sp = { x, y, box }; break;
+  }
+  if (sp) {
+    // clear waves beneath
+    c.save(); c.beginPath(); c.rect(sp.box.x, sp.box.y, sp.box.w, sp.box.h); c.clip();
+    c.drawImage(paper, 0, 0);
+    c.globalCompositeOperation = 'multiply'; c.fillStyle = 'rgba(190,204,188,0.6)'; c.fillRect(sp.box.x, sp.box.y, sp.box.w, sp.box.h);
+    c.restore();
+    drawSerpent(c, sp.x, sp.y, 1);
+    occ.push(sp.box);
+  }
+
+  // ---- land ----
+  c.save(); c.clip(landPath);
+  c.drawImage(paper, 0, 0);
+  c.globalCompositeOperation = 'multiply';
+  c.fillStyle = 'rgba(240,214,160,0.6)'; c.fillRect(0, 0, W, H);
+  c.globalCompositeOperation = 'source-over';
+  c.lineJoin = 'round';
+  for (const [w, a] of [[64, 0.06], [40, 0.07], [22, 0.09], [10, 0.12]]) { c.strokeStyle = `rgba(120,72,24,${a})`; c.lineWidth = w; c.stroke(landPath); }
+
+  // beaches: stipple
+  for (const r of m.beach) {
+    const p = ringsPath([tr(r)]); const xs = r.map(q => X(q[0])), ys = r.map(q => Y(q[1]));
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    c.fillStyle = 'rgba(42,25,11,0.55)';
+    for (let y = y0; y < y1; y += 7) for (let x = x0; x < x1; x += 7) {
+      const px = x + rnd() * 6, py = y + rnd() * 6;
+      if (rnd() < 0.55 && c.isPointInPath(p, px, py)) { c.beginPath(); c.arc(px, py, 1.1, 0, Math.PI * 2); c.fill(); }
+    }
+  }
+  // vegetation glyphs
+  const glyphs = [];
+  const scatter = (rings, spacing, kind) => {
+    for (const r0 of rings) {
+      const r = tr(r0); const p = ringsPath([r]);
+      const xs = r.map(q => q[0]), ys = r.map(q => q[1]);
+      const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+      for (let y = y0; y < y1; y += spacing * 0.86) for (let x = x0; x < x1; x += spacing) {
+        const px = x + (rnd() - 0.5) * spacing * 0.7, py = y + (rnd() - 0.5) * spacing * 0.6;
+        if (!c.isPointInPath(p, px, py) || !isLand(px, py) || c.isPointInPath(lakePath, px, py)) continue;
+        const gb = { x: px - 10, y: py - 12, w: 20, h: 24 };
+        if (placed.some(L => overlap({ x: L.bx - 4, y: L.by - 4, w: L.tw + 8, h: L.lh * L.lines.length + 8 }, gb))) continue;
+        if (overlap(roseBox, gb) || overlap(cart, gb)) continue;
+        glyphs.push({ kind, x: px, y: py, r: kind === 'tree' ? 9 + rnd() * 4 : 6 + rnd() * 3 });
+      }
+    }
+  };
+  scatter(m.wood, 26, 'tree');
+  scatter(m.scrub, 34, 'tuft');
+  scatter(m.wetland, 36, 'marsh');
+  scatter(m.rock, 30, 'rock');
+  glyphs.sort((a, b) => a.y - b.y);
+  for (const g of glyphs.slice(0, 6000)) {
+    if (g.kind === 'tree') drawTree(c, g.x, g.y, g.r, rnd);
+    else if (g.kind === 'tuft') drawTuft(c, g.x, g.y, g.r);
+    else if (g.kind === 'marsh') drawMarsh(c, g.x, g.y, g.r);
+    else { c.strokeStyle = 'rgba(42,25,11,0.7)'; c.lineWidth = 1.3; c.beginPath(); c.moveTo(g.x - g.r, g.y + 3); c.lineTo(g.x, g.y - g.r); c.lineTo(g.x + g.r, g.y + 3); c.stroke(); }
+  }
+  c.restore();
+
+  // lakes
+  if (m.water.length) {
+    c.save(); c.clip(lakePath);
+    c.globalCompositeOperation = 'multiply'; c.fillStyle = 'rgba(176,192,178,0.85)'; c.fillRect(0, 0, W, H);
+    c.globalCompositeOperation = 'source-over';
+    c.strokeStyle = 'rgba(42,25,11,0.3)'; c.lineWidth = 1.2; c.lineWidth = 10; c.stroke(lakePath);
+    c.restore();
+    c.strokeStyle = INK; c.lineWidth = 1.8; c.lineJoin = 'round'; c.stroke(lakePath);
+  }
+  // streams
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  for (const st of m.streams) {
+    c.strokeStyle = 'rgba(42,25,11,0.7)'; c.lineWidth = st.r ? 2.6 : 1.5;
+    c.stroke(ringsPath([wobbleRing(tr(st.p), rnd, 1.2).slice(0, -1)], false));
+  }
+  // cliffs
+  for (const cl of m.cliff) {
+    const pts = tr(cl);
+    c.strokeStyle = INK; c.lineWidth = 1.8; c.stroke(ringsPath([pts], false));
+    c.lineWidth = 1.1;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [x1, y1] = pts[i], [x2, y2] = pts[i + 1]; const L = Math.hypot(x2 - x1, y2 - y1); if (!L) continue;
+      const ux = (x2 - x1) / L, uy = (y2 - y1) / L;
+      for (let t = 0; t < L; t += 7) { const x = x1 + ux * t, y = y1 + uy * t; c.beginPath(); c.moveTo(x, y); c.lineTo(x - uy * 8, y + ux * 8); c.stroke(); }
+    }
+  }
+  // roads & trails
+  c.strokeStyle = INK;
+  for (const r of m.roads) {
+    c.lineWidth = r.c ? 3.4 : 2.2; c.setLineDash(r.c ? [] : [18, 5]);
+    c.stroke(ringsPath([tr(r.p)], false));
+  }
+  c.lineWidth = 2; c.setLineDash([7, 7]); c.strokeStyle = 'rgba(42,25,11,0.85)';
+  for (const r of m.trails) c.stroke(ringsPath([tr(r)], false));
+  c.setLineDash([]);
+  // buildings
+  c.fillStyle = 'rgba(42,25,11,0.78)';
+  for (const b of m.buildings) c.fill(ringsPath([tr(b)]));
+
+  // coastline
+  c.strokeStyle = INK; c.lineJoin = 'round'; c.lineWidth = 3.4; c.stroke(landPath);
+  c.lineWidth = 1; c.strokeStyle = 'rgba(42,25,11,0.5)';
+  c.restore(); // end map clip
+
+  // ---- rose & cartouche ----
+  c.save(); c.beginPath(); c.rect(PAD, PAD, iw, ih); c.clip();
+  drawRose(c, rose.x, rose.y, R);
+  c.restore();
+
+  // cartouche
+  {
+    const { x, y, w, h } = cart;
+    c.save();
+    c.beginPath(); c.rect(x, y, w, h); c.clip();
+    c.drawImage(paper, 0, 0);
+    c.globalCompositeOperation = 'multiply'; c.fillStyle = 'rgba(236,214,166,0.55)'; c.fillRect(x, y, w, h);
+    c.restore();
+    c.strokeStyle = INK; c.lineWidth = 3; c.strokeRect(x, y, w, h);
+    c.lineWidth = 1.2; c.strokeRect(x + 8, y + 8, w - 16, h - 16);
+    for (const [cx, cy] of [[x + 8, y + 8], [x + w - 8, y + 8], [x + 8, y + h - 8], [x + w - 8, y + h - 8]]) {
+      c.fillStyle = '#e8d4a4'; c.beginPath(); c.arc(cx, cy, 9, 0, Math.PI * 2); c.fill(); c.stroke();
+      c.fillStyle = INK; c.beginPath(); c.arc(cx, cy, 3, 0, Math.PI * 2); c.fill();
+    }
+    c.fillStyle = INK; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+    let fs = 92; c.font = `${fs}px ${FONT_D}`;
+    while (c.measureText(info.name).width > w - 70 && fs > 40) { fs -= 4; c.font = `${fs}px ${FONT_D}`; }
+    c.fillText(info.name, x + w / 2, y + 26 + fs * 0.9);
+    c.font = `italic 26px ${FONT}`;
+    c.fillText(info.region, x + w / 2, y + 26 + fs * 0.9 + 36);
+    // flourish
+    const fy = y + 26 + fs * 0.9 + 54;
+    c.lineWidth = 1.4; c.beginPath(); c.moveTo(x + w * 0.22, fy); c.bezierCurveTo(x + w * 0.38, fy - 8, x + w * 0.42, fy + 8, x + w / 2, fy); c.bezierCurveTo(x + w * 0.58, fy - 8, x + w * 0.62, fy + 8, x + w * 0.78, fy); c.stroke();
+    c.beginPath(); c.arc(x + w / 2, fy, 3.5, 0, Math.PI * 2); c.fill();
+    // scale of paces
+    const target = (w * 0.62) / s / PACE; // paces that fit
+    const unit = niceStep(target / 4);
+    const segs = Math.max(2, Math.min(5, Math.floor(target / unit)));
+    const segPx = unit * PACE * s, barW = segPx * segs;
+    const bx = x + (w - barW) / 2, by = y + h - 52;
+    c.lineWidth = 1.4;
+    for (let i = 0; i < segs; i++) {
+      c.fillStyle = i % 2 ? '#e8d4a4' : INK;
+      c.fillRect(bx + i * segPx, by, segPx, 9); c.strokeRect(bx + i * segPx, by, segPx, 9);
+    }
+    c.fillStyle = INK; c.font = `20px ${FONT}`;
+    for (let i = 0; i <= segs; i++) c.fillText(fmtPaces(unit * i), bx + i * segPx, by - 8);
+    c.font = `18px ${FONT_SC}`;
+    spacedText(c, 'A Scale of Paces', x + w / 2, by + 32, 2.5);
+  }
+
+  // ---- labels ----
+  c.textBaseline = 'top'; c.textAlign = 'left';
+  for (const L of placed) {
+    if (L.k === 'peak') drawPeak(c, L.px, L.py - 6, 20);
+    if (L.marker) drawMarker(c, L.px, L.py);
+    c.font = L.st.font;
+    // soft paper halo for legibility
+    c.save(); c.globalAlpha = 0.55; c.fillStyle = '#e6d2a2';
+    c.shadowColor = '#e6d2a2'; c.shadowBlur = 10;
+    c.fillRect(L.bx + 2, L.by + 4, L.tw - 4, L.lh * L.lines.length - 8);
+    c.restore();
+    c.fillStyle = L.st.color;
+    L.lines.forEach((t, i) => {
+      const lw = spacedWidth(c, t, L.st.sp);
+      spacedText(c, t, L.bx + (L.tw - lw) / 2, L.by + i * L.lh, L.st.sp, 'left');
+    });
+  }
+
+  // ---- frame & graticule ----
+  const [S, Wl, N, E] = m.bbox;
+  const kx = Math.cos((S + N) / 2 * Math.PI / 180) * 111320, ky = 110574;
+  const latY = lat => PAD + (N - lat) * ky * s, lonX = lon => PAD + (lon - Wl) * kx * s;
+  c.strokeStyle = INK; c.fillStyle = INK;
+  c.lineWidth = 3.2; c.strokeRect(PAD, PAD, iw, ih);
+  c.lineWidth = 1.6; c.strokeRect(PAD - BAND, PAD - BAND, iw + BAND * 2, ih + BAND * 2);
+  const stepMin = (span) => { for (const st of [0.25, 0.5, 1, 2, 5, 10]) if (span / st <= 7) return st; return 15; };
+  const fmtMin = (v, pos, neg) => {
+    const h = v >= 0 ? pos : neg; const a = Math.abs(v); let d = Math.floor(a + 1e-9); let mm = (a - d) * 60;
+    if (mm > 59.999) { d += 1; mm = 0; }
+    const mt = Math.abs(mm - Math.round(mm)) < 1e-6 ? String(Math.round(mm)).padStart(2, '0') : mm.toFixed(2).replace(/0$/, '').padStart(4, '0');
+    return `${d}°${mt}′${h}`;
+  };
+  const strip = 10;
+  c.font = `19px ${FONT}`; c.textBaseline = 'middle';
+  // latitude (left/right)
+  {
+    const st = stepMin((N - S) * 60) / 60;
+    const ticks = []; for (let v = Math.ceil(S / st - 1e-9) * st; v <= N + 1e-9; v += st) ticks.push(v);
+    const edges = [S, ...ticks.filter(v => v > S && v < N), N];
+    for (let i = 0; i < edges.length - 1; i++) {
+      const y1 = latY(edges[i + 1]), y2 = latY(edges[i]);
+      const parity = Math.round((edges[i] - ticks[0]) / st) % 2 === 0;
+      for (const sx of [PAD - strip, PAD + iw]) { if (parity) c.fillRect(sx, y1, strip, y2 - y1); c.lineWidth = 1; c.strokeRect(sx, y1, strip, y2 - y1); }
+    }
+    for (const v of ticks) {
+      const y = latY(v); c.lineWidth = 1.4;
+      c.beginPath(); c.moveTo(PAD - BAND, y); c.lineTo(PAD, y); c.moveTo(PAD + iw, y); c.lineTo(PAD + iw + BAND, y); c.stroke();
+      const t = fmtMin(v, 'N', 'S');
+      c.save(); c.translate(PAD - BAND - 16, y); c.rotate(-Math.PI / 2); c.textAlign = 'center'; c.fillText(t, 0, 0); c.restore();
+      c.save(); c.translate(PAD + iw + BAND + 16, y); c.rotate(Math.PI / 2); c.textAlign = 'center'; c.fillText(t, 0, 0); c.restore();
+    }
+  }
+  // longitude (top/bottom)
+  {
+    const st = stepMin((E - Wl) * 60) / 60;
+    const ticks = []; for (let v = Math.ceil(Wl / st - 1e-9) * st; v <= E + 1e-9; v += st) ticks.push(v);
+    const edges = [Wl, ...ticks.filter(v => v > Wl && v < E), E];
+    for (let i = 0; i < edges.length - 1; i++) {
+      const x1 = lonX(edges[i]), x2 = lonX(edges[i + 1]);
+      const parity = Math.round((edges[i] - ticks[0]) / st) % 2 === 0;
+      for (const sy of [PAD - strip, PAD + ih]) { if (parity) c.fillRect(x1, sy, x2 - x1, strip); c.lineWidth = 1; c.strokeRect(x1, sy, x2 - x1, strip); }
+    }
+    c.textAlign = 'center';
+    for (const v of ticks) {
+      const x = lonX(v); c.lineWidth = 1.4;
+      c.beginPath(); c.moveTo(x, PAD - BAND); c.lineTo(x, PAD); c.moveTo(x, PAD + ih); c.lineTo(x, PAD + ih + BAND); c.stroke();
+      const t = fmtMin(v, 'E', 'W');
+      c.fillText(t, x, PAD - BAND - 16); c.fillText(t, x, PAD + ih + BAND + 16);
+    }
+  }
+  c.font = `italic 17px ${FONT}`; c.textAlign = 'right'; c.textBaseline = 'alphabetic';
+  c.fillText('Map data © OpenStreetMap contributors', PAD + iw - 12, PAD + ih - 12);
+
+  // ---- stains, then burnt edge ----
+  for (let i = 0; i < 2; i++) {
+    const x = PAD + rnd() * iw, y = PAD + rnd() * ih, r = 90 + rnd() * 110;
+    c.strokeStyle = 'rgba(120,70,20,0.10)'; c.lineWidth = 5 + rnd() * 4;
+    c.beginPath(); c.arc(x, y, r, rnd(), rnd() + Math.PI * (1.4 + rnd() * 0.5)); c.stroke();
+    c.fillStyle = 'rgba(140,90,30,0.035)'; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+  }
+  const edge = new Path2D();
+  {
+    const per = 2 * (W + H); const a1 = rnd() * 50, a2 = rnd() * 50;
+    const inset = t => 14 + 9 * Math.sin(t * 0.011 + a1) + 6 * Math.sin(t * 0.047 + a2) + 3 * Math.sin(t * 0.17) + rnd() * 2.5;
+    let first = true;
+    for (let t = 0; t < per; t += 10) {
+      let x, y; const d = inset(t);
+      if (t < W) { x = t; y = d; } else if (t < W + H) { x = W - d; y = t - W; } else if (t < 2 * W + H) { x = W - (t - W - H); y = H - d; } else { x = d; y = H - (t - 2 * W - H); }
+      x = clamp(x, d, W - d); y = clamp(y, d, H - d);
+      if (first) { edge.moveTo(x, y); first = false; } else edge.lineTo(x, y);
+    }
+    edge.closePath();
+  }
+  c.save(); c.clip(edge);
+  c.lineJoin = 'round';
+  for (const [w, a] of [[120, 0.07], [70, 0.10], [40, 0.14], [20, 0.22], [8, 0.4], [3, 0.6]]) { c.strokeStyle = `rgba(78,42,12,${a})`; c.lineWidth = w; c.stroke(edge); }
+  c.restore();
+  c.save(); c.globalCompositeOperation = 'destination-out';
+  const outer = new Path2D(); outer.rect(-10, -10, W + 20, H + 20); outer.addPath(edge);
+  c.fill(outer, 'evenodd'); c.restore();
+
+  const landmarks = placed.filter(L => L.marker).map(L => ({ n: L.n, k: L.k, x: L.x, y: L.y }));
+  return { key, m, cv, W, H, s, iw, ih, D, landPath, lakePath, landmarks, kx, ky, bbox: m.bbox };
+}
+
+// ---------- game state ----------
+const hot = window.claude && window.claude.hot;
+const charts = {};
+let cur = 'oak';
+let hunts = {};
+let purse = { chests: 0, gold: 0 };
+try { const p = JSON.parse(localStorage.getItem('ptg-purse') || 'null'); if (p && typeof p.chests === 'number') purse = p; } catch (e) { /* storage unavailable */ }
+function savePurse() { try { localStorage.setItem('ptg-purse', JSON.stringify(purse)); } catch (e) { /* ignore */ } }
+
+const MAX_DIGS = 5;
+const probe = mk(4, 4).getContext('2d');
+function onLand(ch, mx, my) {
+  const x = PAD + mx * ch.s, y = PAD + my * ch.s;
+  return probe.isPointInPath(ch.landPath, x, y) && !probe.isPointInPath(ch.lakePath, x, y);
+}
+
+function newHunt(ch) {
+  const lm = ch.landmarks.length ? ch.landmarks : ch.m.labels.map(l => ({ n: l.n, k: l.k, x: l.x, y: l.y }));
+  const D = ch.D; const mw = ch.m.w, mh = ch.m.h;
+  const prev = hunts[ch.key];
+  for (let tries = 0; tries < 3000; tries++) {
+    const L = lm[Math.floor(Math.random() * lm.length)];
+    const k = Math.floor(Math.random() * 32); const brg = k * 11.25;
+    const dist = D * (0.06 + Math.random() * 0.24);
+    const paces = Math.max(30, Math.round(dist / PACE / 10) * 10);
+    const dm = paces * PACE, rad = brg * Math.PI / 180;
+    const tx = L.x + Math.sin(rad) * dm, ty = L.y - Math.cos(rad) * dm;
+    if (tx < mw * 0.05 || tx > mw * 0.95 || ty < mh * 0.05 || ty > mh * 0.95) continue;
+    if (!onLand(ch, tx, ty)) continue;
+    // keep the chest clear of the shore so a near miss is still a dig on land
+    const rr = D * 0.012; let shore = false;
+    for (let a = 0; a < 8; a++) if (!onLand(ch, tx + Math.cos(a * Math.PI / 4) * rr, ty + Math.sin(a * Math.PI / 4) * rr)) shore = true;
+    if (shore && tries < 2500) continue;
+    if (prev && prev.lm === L.n && tries < 2000) continue;
+    return { lm: L.n, lx: L.x, ly: L.y, k, paces, tx, ty, R: D * 0.02, digs: [], log: [], over: false, won: false };
+  }
+  return null;
+}
+
+// ---------- view ----------
+const $ = id => document.getElementById(id);
+const cvs = $('chart'), ctx = cvs.getContext('2d'), wrap = $('wrap');
+let dpr = 1, view = { z: 1, x: 0, y: 0 }, fitZ = 1, mode = 'dig', measure = null, hover = null;
+let needsDraw = false;
+function requestDraw() { if (!needsDraw) { needsDraw = true; requestAnimationFrame(() => { needsDraw = false; draw(); }); } }
+
+function resize() {
+  const r = wrap.getBoundingClientRect();
+  dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (cvs.width !== w || cvs.height !== h) {
+    const ch = charts[cur]; const keep = ch && view.z > fitZ * 1.001 ? { cx: (cvs.width / 2 - view.x) / view.z, cy: (cvs.height / 2 - view.y) / view.z, rel: view.z / fitZ } : null;
+    cvs.width = w; cvs.height = h;
+    fit();
+    if (keep) { setZoom(fitZ * keep.rel, w / 2, h / 2); view.x = w / 2 - keep.cx * view.z; view.y = h / 2 - keep.cy * view.z; clampView(); }
+  }
+  requestDraw();
+}
+function fit() {
+  const ch = charts[cur]; if (!ch) return;
+  const z = Math.min(cvs.width / ch.W, cvs.height / ch.H);
+  fitZ = z; view = { z, x: (cvs.width - ch.W * z) / 2, y: (cvs.height - ch.H * z) / 2 };
+  requestDraw();
+}
+const maxZ = () => Math.max(fitZ * 2, Math.min(fitZ * 9, 2.4));
+function setZoom(z, sx, sy) {
+  z = clamp(z, fitZ, maxZ());
+  const cx = (sx - view.x) / view.z, cy = (sy - view.y) / view.z;
+  view.z = z; view.x = sx - cx * z; view.y = sy - cy * z; clampView(); requestDraw();
+}
+function clampView() {
+  const ch = charts[cur]; if (!ch) return;
+  const w = ch.W * view.z, h = ch.H * view.z;
+  view.x = w <= cvs.width ? (cvs.width - w) / 2 : clamp(view.x, cvs.width - w, 0);
+  view.y = h <= cvs.height ? (cvs.height - h) / 2 : clamp(view.y, cvs.height - h, 0);
+}
+function toMeters(clientX, clientY) {
+  const r = cvs.getBoundingClientRect(); const ch = charts[cur];
+  const sx = (clientX - r.left) * dpr, sy = (clientY - r.top) * dpr;
+  const cx = (sx - view.x) / view.z, cy = (sy - view.y) / view.z;
+  return { mx: (cx - PAD) / ch.s, my: (cy - PAD) / ch.s, sx, sy };
+}
+
+function drawX(c, x, y, sz, lw) {
+  c.save(); c.lineCap = 'round'; c.strokeStyle = '#a3241a'; c.lineWidth = lw;
+  c.beginPath(); c.moveTo(x - sz, y - sz); c.quadraticCurveTo(x, y + sz * 0.1, x + sz, y + sz); c.moveTo(x + sz, y - sz); c.quadraticCurveTo(x + sz * 0.1, y, x - sz, y + sz); c.stroke();
+  c.restore();
+}
+function labelBox(c, text, x, y, u) {
+  c.font = `${15 * u}px ${FONT}`;
+  const w = c.measureText(text).width + 14 * u, h = 24 * u;
+  c.fillStyle = 'rgba(15,29,28,0.88)'; c.fillRect(x - w / 2, y - h - 10 * u, w, h);
+  c.fillStyle = '#ecdcb6'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, x, y - h / 2 - 10 * u);
+}
+
+function draw() {
+  const ch = charts[cur];
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#0f1d1c'; ctx.fillRect(0, 0, cvs.width, cvs.height);
+  if (!ch) return;
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(ch.cv, view.x, view.y, ch.W * view.z, ch.H * view.z);
+  const hunt = hunts[cur];
+  const P = (mx, my) => [view.x + (PAD + mx * ch.s) * view.z, view.y + (PAD + my * ch.s) * view.z];
+  const u = dpr; const kz = ch.s * view.z;
+  if (hunt) {
+    // dig sites
+    hunt.digs.forEach((d, i) => {
+      const [x, y] = P(d.x, d.y); const r = Math.max(hunt.R * kz, 5 * u);
+      ctx.save();
+      ctx.fillStyle = d.hit ? 'rgba(163,36,26,0.12)' : 'rgba(60,32,10,0.16)';
+      ctx.strokeStyle = d.hit ? 'rgba(163,36,26,0.8)' : 'rgba(42,25,11,0.7)'; ctx.lineWidth = 1.5 * u; ctx.setLineDash([4 * u, 3 * u]);
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(42,25,11,0.85)'; ctx.beginPath(); ctx.ellipse(x, y, 6 * u, 3.6 * u, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2a190b'; ctx.font = `bold ${13 * u}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(String(i + 1), x, y - 6 * u);
+      ctx.restore();
+    });
+    if (hunt.over) {
+      const [lx, ly] = P(hunt.lx, hunt.ly), [tx, ty] = P(hunt.tx, hunt.ty);
+      ctx.save(); ctx.strokeStyle = 'rgba(163,36,26,0.85)'; ctx.lineWidth = 2.2 * u; ctx.setLineDash([2 * u, 6 * u]); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(tx, ty); ctx.stroke(); ctx.restore();
+      drawX(ctx, tx, ty, 13 * u, 5 * u);
+      labelBox(ctx, `${fmtPaces(hunt.paces)} paces ${POINTS32[hunt.k]}`, tx, ty - 14 * u, u);
+    }
+  }
+  // dividers
+  if (measure && measure.b) {
+    const [ax, ay] = P(measure.a.mx, measure.a.my), [bx, by] = P(measure.b.mx, measure.b.my);
+    ctx.save(); ctx.strokeStyle = '#2a190b'; ctx.lineWidth = 2 * u; ctx.setLineDash([10 * u, 5 * u]);
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#2a190b';
+    for (const [x, y] of [[ax, ay], [bx, by]]) { ctx.beginPath(); ctx.arc(x, y, 3.5 * u, 0, Math.PI * 2); ctx.fill(); }
+    const dm = Math.hypot(measure.b.mx - measure.a.mx, measure.b.my - measure.a.my);
+    const brg = bearingOf(measure.a.mx, measure.a.my, measure.b.mx, measure.b.my);
+    const pt = POINTS32[Math.round(brg / 11.25) % 32];
+    labelBox(ctx, `${fmtPaces(dm / PACE)} paces · ${brg.toFixed(1)}° · ${pt}${measure.snap ? ' from ' + measure.snap : ''}`, bx, by - 6 * u, u);
+    ctx.restore();
+  }
+}
+
+// ---------- UI ----------
+function renderTabs() {
+  const nav = $('tabs'); nav.innerHTML = '';
+  for (const k of ORDER) {
+    const b = document.createElement('button');
+    b.className = 'chart-tab'; b.setAttribute('role', 'tab'); b.id = 'tab-' + k;
+    b.setAttribute('aria-selected', String(k === cur));
+    b.innerHTML = `<small>${INFO[k].short}</small><span>${INFO[k].name}</span>`;
+    b.addEventListener('click', () => switchTo(k));
+    nav.appendChild(b);
+  }
+}
+const SPADE = '<svg class="pip-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6"/><path d="M17 7l-6.5 6.5"/><path d="M10.5 13.5l-4.8 1.1a1 1 0 0 0-.6.4L3.5 18a1.4 1.4 0 0 0 1.9 1.9l3-1.6a1 1 0 0 0 .4-.6l1.1-4.8z"/></svg>';
+function renderLog() {
+  const info = INFO[cur]; const hunt = hunts[cur];
+  $('isle-name').textContent = info.name; $('isle-region').textContent = info.region; $('isle-blurb').textContent = info.blurb;
+  $('purse-chests').textContent = purse.chests; $('purse-gold').textContent = purse.gold.toLocaleString('en-US');
+  const pips = $('pips'); pips.innerHTML = '';
+  const left = hunt ? MAX_DIGS - hunt.digs.length : MAX_DIGS;
+  for (let i = 0; i < MAX_DIGS; i++) { const s = document.createElement('span'); s.className = 'pip' + (i < left && !(hunt && hunt.won) ? '' : ' spent'); s.innerHTML = SPADE; pips.appendChild(s); }
+  if (!hunt) { $('clue').textContent = 'The chart is still being inked.'; $('clue-fine').textContent = ''; return; }
+  $('clue').innerHTML = `Begin at <b>${escapeHtml(hunt.lm)}</b>. From thence walk <b>${fmtPaces(hunt.paces)} paces</b> ${POINTS32[hunt.k].replace(/^./, ch => ch.toLowerCase())} (${degFrac(hunt.k * 11.25)}), and there dig.`;
+  $('clue-fine').textContent = `A dig turns up the chest within ${Math.round(hunt.R / PACE)} paces of where it lies. Use the dividers to lay off the distance from the landmark’s ring on the chart.`;
+  const ol = $('parrot'); ol.innerHTML = '';
+  for (const e of hunt.log.slice().reverse()) {
+    const li = document.createElement('li'); li.className = e.cls || '';
+    li.innerHTML = `<span class="who">${escapeHtml(e.who)}</span><span class="msg">${escapeHtml(e.msg)}</span>`;
+    ol.appendChild(li);
+  }
+  $('newHunt').classList.toggle('primary', !!hunt.over);
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+
+function setMode(m) {
+  mode = m;
+  $('t-dig').setAttribute('aria-pressed', String(m === 'dig'));
+  $('t-measure').setAttribute('aria-pressed', String(m === 'measure'));
+  cvs.classList.toggle('measuring', m === 'measure');
+  $('hint').textContent = m === 'dig' ? 'Tap land to dig. Drag to pan; scroll or pinch to zoom.' : 'Drag from a landmark to measure paces and bearing.';
+}
+
+function dig(mx, my) {
+  const ch = charts[cur], hunt = hunts[cur]; if (!hunt || hunt.over) return;
+  if (mx < 0 || my < 0 || mx > ch.m.w || my > ch.m.h) return;
+  if (!onLand(ch, mx, my)) {
+    const inLake = probe.isPointInPath(ch.lakePath, PAD + mx * ch.s, PAD + my * ch.s);
+    hunt.log.push({ who: 'Bosun', msg: inLake ? 'That’s a pond, Cap’n. Pick dry ground.' : 'Ye can’t dig in the briny deep, Cap’n. Pick dry land.' });
+    renderLog(); return;
+  }
+  const d = Math.hypot(mx - hunt.tx, my - hunt.ty);
+  const hit = d <= hunt.R;
+  hunt.digs.push({ x: mx, y: my, hit });
+  if (hit) {
+    const left = MAX_DIGS - hunt.digs.length;
+    const gold = 100 + 60 * left;
+    hunt.over = true; hunt.won = true;
+    purse.chests += 1; purse.gold += gold; savePurse();
+    hunt.log.push({ who: 'Crew', cls: 'win', msg: `Clunk! The spade strikes oak. ${gold} doubloons, ${hunt.digs.length === 1 ? 'first dig' : `found on dig ${hunt.digs.length}`}.` });
+  } else {
+    const r = d / ch.D;
+    const heat = r < 0.035 ? 'Scalding! Ye be nearly upon it!' : r < 0.07 ? 'Hot, hot!' : r < 0.14 ? 'Warm.' : r < 0.25 ? 'Cool.' : 'Cold as Davy Jones’ locker.';
+    const dir = POINTS8[Math.round(bearingOf(mx, my, hunt.tx, hunt.ty) / 45) % 8];
+    const paceOff = Math.round(d / PACE / 10) * 10;
+    if (hunt.digs.length >= MAX_DIGS) {
+      hunt.over = true;
+      hunt.log.push({ who: 'Parrot', cls: 'hot', msg: `${heat} Squawk, ${dir}!` });
+      hunt.log.push({ who: 'Bosun', msg: `Out of digs. The chest lay ${fmtPaces(paceOff)} paces to the ${dir}. It’s marked on the chart.` });
+    } else {
+      hunt.log.push({ who: 'Parrot', cls: r < 0.07 ? 'hot' : '', msg: `${heat} Squawk, ${dir}! ${dir}!` });
+    }
+  }
+  renderLog(); requestDraw();
+}
+
+function snapLandmark(mx, my) {
+  const ch = charts[cur]; const tol = 16 * dpr / (view.z * ch.s);
+  let best = null;
+  for (const L of ch.landmarks) { const d = Math.hypot(L.x - mx, L.y - my); if (d < tol && (!best || d < best.d)) best = { ...L, d }; }
+  return best;
+}
+
+// pointer handling
+const ptrs = new Map(); let gesture = null;
+cvs.addEventListener('pointerdown', e => {
+  cvs.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()];
+    gesture = { type: 'pinch', d: Math.hypot(a.x - b.x, a.y - b.y), z: view.z };
+    return;
+  }
+  const p = toMeters(e.clientX, e.clientY);
+  gesture = { type: 'press', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y, moved: false, p };
+  if (mode === 'measure') {
+    const sn = snapLandmark(p.mx, p.my);
+    measure = { a: sn ? { mx: sn.x, my: sn.y } : { mx: p.mx, my: p.my }, b: null, snap: sn ? sn.n : null };
+  }
+});
+cvs.addEventListener('pointermove', e => {
+  if (charts[cur]) {
+    const p = toMeters(e.clientX, e.clientY); const ch = charts[cur];
+    if (p.mx >= 0 && p.my >= 0 && p.mx <= ch.m.w && p.my <= ch.m.h) {
+      const lat = ch.bbox[2] - p.my / ch.ky, lon = ch.bbox[1] + p.mx / ch.kx;
+      $('readout').textContent = `${dms(lat, 'N', 'S')}  ${dms(lon, 'E', 'W')}`; $('readout').hidden = false;
+    }
+  }
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (gesture && gesture.type === 'pinch' && ptrs.size >= 2) {
+    const [a, b] = [...ptrs.values()]; const r = cvs.getBoundingClientRect();
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    setZoom(gesture.z * d / gesture.d, ((a.x + b.x) / 2 - r.left) * dpr, ((a.y + b.y) / 2 - r.top) * dpr);
+    return;
+  }
+  if (!gesture || gesture.type !== 'press') return;
+  const dx = e.clientX - gesture.sx, dy = e.clientY - gesture.sy;
+  if (!gesture.moved && Math.hypot(dx, dy) > 5) { gesture.moved = true; if (mode === 'dig') cvs.classList.add('panning'); }
+  if (!gesture.moved) return;
+  if (mode === 'measure') {
+    const p = toMeters(e.clientX, e.clientY); measure.b = { mx: p.mx, my: p.my }; requestDraw();
+  } else {
+    view.x = gesture.vx + dx * dpr; view.y = gesture.vy + dy * dpr; clampView(); requestDraw();
+  }
+});
+function endPointer(e) {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  cvs.classList.remove('panning');
+  if (gesture && gesture.type === 'press' && !gesture.moved && e.type === 'pointerup') {
+    if (mode === 'dig') dig(gesture.p.mx, gesture.p.my);
+    else { measure = null; requestDraw(); }
+  }
+  if (ptrs.size === 0) gesture = null;
+  else if (gesture && gesture.type === 'pinch') gesture = { type: 'idle' };
+}
+cvs.addEventListener('pointerup', endPointer);
+cvs.addEventListener('pointercancel', endPointer);
+cvs.addEventListener('pointerleave', () => { if (!ptrs.size) $('readout').hidden = true; });
+cvs.addEventListener('wheel', e => {
+  e.preventDefault(); const r = cvs.getBoundingClientRect();
+  setZoom(view.z * Math.exp(-e.deltaY * 0.0016), (e.clientX - r.left) * dpr, (e.clientY - r.top) * dpr);
+}, { passive: false });
+
+$('t-dig').addEventListener('click', () => setMode('dig'));
+$('t-measure').addEventListener('click', () => setMode('measure'));
+$('z-in').addEventListener('click', () => setZoom(view.z * 1.5, cvs.width / 2, cvs.height / 2));
+$('z-out').addEventListener('click', () => setZoom(view.z / 1.5, cvs.width / 2, cvs.height / 2));
+$('z-fit').addEventListener('click', () => fit());
+$('newHunt').addEventListener('click', () => { const ch = charts[cur]; if (!ch) return; hunts[cur] = newHunt(ch); measure = null; renderLog(); requestDraw(); });
+window.addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('input,textarea')) return;
+  if (e.key === '+' || e.key === '=') setZoom(view.z * 1.5, cvs.width / 2, cvs.height / 2);
+  else if (e.key === '-' || e.key === '_') setZoom(view.z / 1.5, cvs.width / 2, cvs.height / 2);
+  else if (e.key === '0') fit();
+  else if (e.key === 'm' || e.key === 'M') setMode('measure');
+  else if (e.key === 'd' || e.key === 'D') setMode('dig');
+});
+new ResizeObserver(resize).observe(wrap);
+
+function switchTo(k) {
+  cur = k; measure = null; renderTabs();
+  if (!charts[k]) {
+    $('loading').hidden = false; renderLog(); requestDraw();
+    setTimeout(() => {
+      charts[k] = buildChart(k);
+      if (!hunts[k]) hunts[k] = newHunt(charts[k]);
+      $('loading').hidden = true;
+      if (cur === k) { fit(); renderLog(); }
+    }, 30);
+  } else {
+    $('loading').hidden = true; fit(); renderLog();
+  }
+}
+
+async function start(data) {
+  if (data && data.hunts) { hunts = data.hunts; cur = data.cur || cur; }
+  setMode('dig'); renderTabs(); renderLog(); resize();
+  try {
+    await Promise.race([
+      Promise.all([`32px ${FONT}`, `italic 32px ${FONT}`, `32px ${FONT_SC}`, `32px ${FONT_D}`].map(f => document.fonts.load(f))),
+      new Promise(r => setTimeout(r, 3000)),
+    ]);
+  } catch (e) { /* fall back to system fonts */ }
+  switchTo(cur);
+}
+if (hot && hot.snapshot) hot.snapshot(() => ({ cur, hunts }));
+if (hot && hot.ready) hot.ready(start); else start((hot && hot.data) || {});
+})();
+</script>

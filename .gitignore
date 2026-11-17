@@ -1,0 +1,4 @@
+# Raw Overpass downloads (re-fetch with island-hunt/scripts/fetch_osm.sh)
+island-hunt/osm/
+__pycache__/
+.DS_Store
