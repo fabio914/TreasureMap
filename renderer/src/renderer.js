@@ -2,6 +2,7 @@
 // Everything is drawn in CSS pixels; layer canvases are device-pixel sized.
 import { hash2, drawText, spacedWidth } from './util.js';
 import { buildLand, landAt, signedArea } from './coast.js';
+import { rectsIntersect } from './geo.js';
 import * as G from './glyphs.js';
 import { INK, FONTS } from './glyphs.js';
 import { makeParchmentTile, makeHatchTile } from './parchment.js';
@@ -298,7 +299,10 @@ export class TreasureRenderer {
 
   /**
    * Render a view of the store into ctx (a device-pixel canvas).
-   * opts: { dpr, hud (from hudLayout), coastReady }
+   * opts: { dpr, hud (from hudLayout), surveyed, fogText }
+   *   surveyed: world rectangles whose data (at least the coastline) has loaded. Land is built
+   *   separately inside each, and anything outside them is drawn as unsurveyed parchment.
+   *   Leave it out when the whole view's data is present (as in the offline tests).
    * Returns what was drawn, for titles and hit testing.
    */
   render(ctx, view, store, opts = {}) {
@@ -319,23 +323,33 @@ export class TreasureRenderer {
       (bucket[it.cls] ||= []).push(it);
     });
 
-    // 2. land and sea
+    // 2. land and sea, built separately inside each surveyed cell (the coastline is complete
+    //    there), so a half-loaded view never closes the coast across ground it hasn't seen.
+    //    Rings are counter-clockwise for land and clockwise for water, so the non-zero rule
+    //    fills land and leaves inland seas open.
     const chains = store.coastChains();
-    const land = buildLand(chains, view.bounds(130));
-    let base = null;
-    if (!land.crossed) {
-      base = landAt(chains, view.cx, view.cy, Math.max(w, h) * view.res * 6);
-      if (!base) {
-        const landish = points.some((p) => /^(city|town|village|hamlet)$/.test(p.cls)) ||
-          ['road1', 'road2', 'road3', 'trail', 'rail'].some((k) => lines[k]?.length) || areas.building?.length || areas.wood?.length || areas.residential?.length;
-        base = landish ? 'land' : 'sea';
+    const vr = view.bounds(130);
+    const cells = opts.surveyed || [vr];
+    const landPath = new Path2D(), coastPath = new Path2D();
+    const kinds = new Set();
+    const LANDISH = /^(city|town|village|hamlet|isolated_dwelling)$/;
+    const landishIn = (r) => points.some((p) => LANDISH.test(p.cls) && p.x >= r.minX && p.x <= r.maxX && p.y >= r.minY && p.y <= r.maxY) ||
+      ['road1', 'road2', 'road3', 'trail', 'rail', 'river', 'stream'].some((k) => (lines[k] || []).some((it) => rectsIntersect(it.bbox, r))) ||
+      ['building', 'wood', 'residential', 'scrub'].some((k) => (areas[k] || []).some((it) => rectsIntersect(it.bbox, r)));
+    for (const cell of cells) {
+      const r = { minX: Math.max(cell.minX, vr.minX), minY: Math.max(cell.minY, vr.minY), maxX: Math.min(cell.maxX, vr.maxX), maxY: Math.min(cell.maxY, vr.maxY) };
+      if (r.minX >= r.maxX || r.minY >= r.maxY) continue;
+      const land = buildLand(chains, r);
+      if (land.crossed) kinds.add('mixed');
+      else {
+        let base = landAt(chains, (r.minX + r.maxX) / 2, (r.minY + r.maxY) / 2, Math.max(r.maxX - r.minX, r.maxY - r.minY) * 1.5);
+        if (!base) base = landishIn(r) ? 'land' : 'sea';
+        kinds.add(base);
+        if (base === 'land') this._add(landPath, Float64Array.of(r.minX, r.minY, r.maxX, r.minY, r.maxX, r.maxY, r.minX, r.maxY, r.minX, r.minY), true);
       }
+      for (const ring of land.rings) this._add(landPath, ring, true);
+      for (const l of land.lines) this._add(coastPath, l.pts, l.closed, 1);
     }
-    const landPath = new Path2D();
-    if (base === 'land') landPath.rect(-400, -400, w + 800, h + 800);
-    for (const r of land.rings) this._add(landPath, r, true, 1.1);
-    const coastPath = new Path2D();
-    for (const l of land.lines) this._add(coastPath, l.pts, l.closed, 1.1);
 
     const P = {};
     for (const cls of Object.keys(areas)) {
@@ -346,7 +360,7 @@ export class TreasureRenderer {
     const linePath = (cls, wob = 0) => { const p = new Path2D(); for (const it of lines[cls] || []) this._add(p, it.pts, false, wob); return p; };
 
     // 3. labels first, so decoration can keep clear of them
-    const landOnly = this._mask((m) => { m.fill(landPath, 'evenodd'); if (P.water) { m.globalCompositeOperation = 'destination-out'; m.fill(P.water); } });
+    const landOnly = this._mask((m) => { m.fill(landPath); if (P.water) { m.globalCompositeOperation = 'destination-out'; m.fill(P.water); } });
     const occ = hud.boxes.slice();
     const lab = this._placeLabels(ctx, view, points, occ, landOnly);
     const inLabel = (sx, sy) => lab.labelBoxes.some((b) => sx > b.x && sx < b.x + b.w && sy > b.y && sy < b.y + b.h);
@@ -385,7 +399,7 @@ export class TreasureRenderer {
 
     // 6. open-sea decoration: serpents, then little waves
     const seaBlock = this._mask((m) => {
-      m.fill(landPath, 'evenodd');
+      m.fill(landPath);
       if (P.water) { m.fill(P.water); m.lineWidth = 28; m.stroke(P.water); }
       m.lineWidth = 92; m.stroke(coastPath);
     });
@@ -464,7 +478,7 @@ export class TreasureRenderer {
       if (lines.stream) { lc.strokeStyle = 'rgba(42,25,11,0.75)'; lc.lineWidth = 0.9; lc.stroke(linePath('stream', 0.8)); }
 
       const mk = this.landMask.ctx; mk.setTransform(dpr, 0, 0, dpr, 0, 0); mk.fillStyle = '#000';
-      mk.fill(landPath, 'evenodd');
+      mk.fill(landPath);
       if (P.water) { mk.globalCompositeOperation = 'destination-out'; mk.fill(P.water); mk.globalCompositeOperation = 'source-over'; }
       lc.setTransform(1, 0, 0, 1, 0, 0); lc.globalCompositeOperation = 'destination-in'; lc.drawImage(this.landMask.canvas, 0, 0); lc.globalCompositeOperation = 'source-over';
       c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(this.land.canvas, 0, 0); c.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -521,6 +535,33 @@ export class TreasureRenderer {
         drawText(c, t, L.bx + (L.tw - lw) / 2, L.by + i * L.lh, L.st.sp, true);
       });
     }
+    // 10. parts of the view whose data hasn't arrived: blank, unsurveyed parchment
+    let fogShare = 0;
+    if (opts.surveyed) {
+      const fc = this.ripple.ctx;
+      fc.setTransform(1, 0, 0, 1, 0, 0); fc.globalCompositeOperation = 'source-over'; fc.clearRect(0, 0, fc.canvas.width, fc.canvas.height);
+      fc.setTransform(dpr, 0, 0, dpr, 0, 0);
+      fc.fillStyle = this._pattern(fc, 'paper', view); fc.fillRect(0, 0, w, h);
+      fc.globalCompositeOperation = 'multiply'; fc.fillStyle = 'rgba(228,206,160,0.5)'; fc.fillRect(0, 0, w, h);
+      fc.globalCompositeOperation = 'destination-out'; fc.fillStyle = '#000';
+      let open = 0;
+      for (const cell of opts.surveyed) {
+        const x0 = view.sx(cell.minX), x1 = view.sx(cell.maxX), y0 = view.sy(cell.maxY), y1 = view.sy(cell.minY);
+        fc.fillRect(Math.floor(x0), Math.floor(y0), Math.ceil(x1 - x0) + 1, Math.ceil(y1 - y0) + 1);
+        open += Math.max(0, Math.min(x1, w) - Math.max(x0, 0)) * Math.max(0, Math.min(y1, h) - Math.max(y0, 0));
+      }
+      fc.globalCompositeOperation = 'source-over';
+      fogShare = Math.max(0, 1 - open / (w * h));
+      if (open < w * h - 1) {
+        c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(this.ripple.canvas, 0, 0); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const centreSurveyed = opts.surveyed.some((cell) => view.cx >= cell.minX && view.cx <= cell.maxX && view.cy >= cell.minY && view.cy <= cell.maxY);
+        if (!centreSurveyed && opts.fogText) {
+          c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = 'rgba(42,25,11,0.75)';
+          c.font = `italic 22px ${FONTS.body}`; c.fillText(opts.fogText, w / 2, h / 2);
+          c.font = `13px ${FONTS.sc}`; c.fillText('Waiting for OpenStreetMap data', w / 2, h / 2 + 24);
+        }
+      }
+    }
     c.restore();
 
     const named = [];
@@ -530,7 +571,8 @@ export class TreasureRenderer {
       title: this._title(view, points),
       symbols: lab.marks.map((m) => ({ item: m.p, x: m.sx, y: m.sy })).concat(lab.labels.map((l) => ({ item: l.p, x: l.sx, y: l.sy, box: l.box }))),
       named,
-      base: land.crossed ? 'mixed' : base,
+      unsurveyed: fogShare,
+      base: kinds.size === 1 ? [...kinds][0] : kinds.size ? 'mixed' : 'unsurveyed',
     };
   }
 }

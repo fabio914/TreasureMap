@@ -36,13 +36,14 @@ window.addEventListener('hashchange', () => { const v = fromHash(); if (v) map.s
 const statusEl = document.getElementById('status'), statusText = document.getElementById('status-text');
 map.addEventListener('status', (e) => {
   const s = e.detail;
-  const busy = s.active + s.queued > 0;
-  statusEl.classList.toggle('busy', busy);
-  statusEl.classList.toggle('err', !!s.error);
+  const left = s.waiting;
+  statusEl.classList.toggle('busy', left > 0);
+  statusEl.classList.toggle('err', !!s.error && left > 0);
   const mb = (s.bytes / 1e6).toFixed(1);
-  if (s.error) statusText.textContent = `${s.error}. Retrying…`;
-  else if (busy) statusText.textContent = `Surveying ${s.active + s.queued} stretch${s.active + s.queued === 1 ? '' : 'es'} of coast…`;
-  else statusText.textContent = `Chart up to date · ${s.features.toLocaleString('en-US')} features · ${mb} MB`;
+  const parts = `${left} part${left === 1 ? '' : 's'} of the chart`;
+  if (s.error && left) statusText.textContent = `${s.error}. Trying again${s.retryIn ? ` in ${s.retryIn} s` : ''}, ${parts} to go…`;
+  else if (left) statusText.textContent = `Surveying ${parts}…`;
+  else statusText.textContent = `Chart up to date · ${s.features.toLocaleString('en-US')} features · ${mb} MB downloaded`;
 });
 
 const ports = document.getElementById('ports');

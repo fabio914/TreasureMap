@@ -45,9 +45,9 @@ model: fill an `OsmStore` with Overpass JSON and call `TreasureRenderer.render(c
 | File | Job |
 | --- | --- |
 | `src/geo.js` | Web Mercator projection and the `View` (centre, metres per pixel, screen size). |
-| `src/overpass.js` | Loads data by grid cell. Three detail tiers (detail from zoom 15.5, regional from 12.5, wide below), each with its own cell size and query. Missing cells around the view are fetched in one request, nearest first, two at a time, with retries and endpoint fallback. A coarser coastline-only layer is loaded too. |
+| `src/overpass.js` | Loads data one grid cell per request. Three detail tiers (detail from zoom 15.5 in 2 km cells, regional from 12.5 in 16 km cells, wide below in 131 km cells), each with its own query, plus a cheap coastline-only layer that is fetched first. Requests go nearest-first, two at a time, alternating between two Overpass servers; a failed request is retried on the other server with backoff until it succeeds or you move away. Responses are kept in the browser's Cache Storage for 30 days, so places you've seen open instantly. |
 | `src/osm.js` | Turns Overpass JSON into a deduplicated store of areas, lines and points with projected coordinates. Joins multipolygon members into rings. |
-| `src/coast.js` | Builds land for each view. OSM maps coastlines as lines with land on the left, so the merged coastline is clipped to the view and the pieces are closed by walking counter-clockwise along the view edge. When no coastline crosses the view, the nearest coastline segment decides land or sea. |
+| `src/coast.js` | Builds land. OSM maps coastlines as lines with land on the left, so the merged coastline is clipped to a rectangle and the pieces are closed by walking counter-clockwise along its edge. The renderer does this separately inside each loaded cell, where the coastline is known to be complete, and draws cells that haven't loaded yet as blank, unsurveyed parchment. When no coastline crosses a cell, the nearest coastline segment decides land or sea. |
 | `src/renderer.js` | The style: parchment, sea tint, rhumb lines, coastal ripple lines, waves and sea serpents in open water, textured land with coastal shading, trees, scrub, marsh and beach stipple, ink roads, rails, rivers, cliffs and buildings, symbols, and collision-free lettering. |
 | `src/hud.js` | Screen-fixed furniture: frame with a graticule of real latitudes and longitudes, compass rose, cartouche with the area's name and a scale in paces, cables or leagues, attribution and the burnt edge. |
 | `src/map.js` | The interactive controller: gestures, wheel and keyboard, data requests, hit testing and the popup. |
@@ -62,9 +62,11 @@ follows once the gesture settles.
 ```sh
 npm test                                   # coastline assembly unit tests (Node)
 node test/make-fixture.mjs oak -64.2935 44.5135 15.6   # save an Overpass response for a view
-python3 test/mock_overpass.py 8766 oak     # static server + fake Overpass answering with that fixture
+python3 test/mock_overpass.py 8766 oak 3   # static server + fake Overpass answering with that fixture
+                                           # (the optional 3 makes the first three requests fail with 504)
 # then open:
 #   http://127.0.0.1:8766/test/render.html?f=oak        offline render of the fixture
+#   http://127.0.0.1:8766/test/render.html?f=oak&cells=2048&drop=2   ...with half the cells unloaded
 #   http://127.0.0.1:8766/test/interaction.html?overpass=http://127.0.0.1:8766/interpreter
 #                                                       drag, wheel, pinch, click and popup checks
 ```
@@ -73,9 +75,12 @@ Fixtures are not committed (`test/fixtures/` is ignored); make them with `make-f
 
 ## Limits
 
-- **Overpass is a shared, free service.** It is sometimes busy (the loader retries and falls back to a
-  second server), and dense cities at the detail tier can mean several megabytes per view. For heavy
-  use, run your own Overpass instance and pass it with `?overpass=` or the `endpoints` option.
+- **Overpass is a shared, free service, and often busy.** A 502 or 504 means the server is overloaded;
+  the chart keeps retrying on both servers and shows the unloaded parts as unsurveyed parchment
+  meanwhile. A first visit to a new area can take a minute when the servers are struggling; later
+  visits come from the browser cache. Dense cities at the detail tier can mean several megabytes per
+  view. For heavy use, run your own Overpass instance and pass it with `?overpass=` or the `endpoints`
+  option (`cache: false` turns the browser cache off).
 - Woods and other land cover appear from zoom 12.5; wider views show coast, rivers, big roads, lakes
   and places only, to keep downloads small.
 - Road names are not lettered along the roads yet.

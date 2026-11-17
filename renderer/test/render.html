@@ -40,15 +40,29 @@ try {
   for (const c of [map, hud]) { c.width = w * dpr; c.height = h * dpr; }
   const r = new TreasureRenderer();
   const layout = hudLayout(w, h);
+  // ?cells=<metres> treats the view as a grid of separately loaded cells; &drop=<n> leaves every
+  // n-th cell unloaded, to check per-cell land building and the unsurveyed parchment
+  let surveyed;
+  if (qs.get('cells')) {
+    const size = +qs.get('cells'), drop = +(qs.get('drop') || 0), b = view.bounds(130);
+    surveyed = [];
+    let n = 0;
+    for (let j = Math.floor(b.minY / size); j <= Math.floor(b.maxY / size); j++) for (let i = Math.floor(b.minX / size); i <= Math.floor(b.maxX / size); i++) {
+      n++;
+      if (drop && n % drop === 0) continue;
+      surveyed.push({ minX: i * size, minY: j * size, maxX: (i + 1) * size, maxY: (j + 1) * size });
+    }
+  }
+  const opts = { dpr, hud: layout, surveyed, fogText: 'Surveying these parts\u2026' };
   t = performance.now();
-  const res = r.render(map.getContext('2d'), view, store, { dpr, hud: layout, coastReady: true });
+  const res = r.render(map.getContext('2d'), view, store, opts);
   const tRender = performance.now() - t;
   drawHud(hud.getContext('2d'), view, layout, { dpr, title: res.title || 'Terra Incognita', paperTile: r.paperTile });
   // second render to measure a warm frame
   t = performance.now();
-  r.render(map.getContext('2d'), view, store, { dpr, hud: layout, coastReady: true });
+  r.render(map.getContext('2d'), view, store, opts);
   const tWarm = performance.now() - t;
-  log.textContent = `${store.items.size} features, ${store.coast.size} coast ways · ingest ${tIngest.toFixed(0)} ms · render ${tRender.toFixed(0)} ms (warm ${tWarm.toFixed(0)} ms) · title “${res.title}” · base ${res.base} · ${res.symbols.length} symbols`;
+  log.textContent = `${store.items.size} features, ${store.coast.size} coast ways · ingest ${tIngest.toFixed(0)} ms · render ${tRender.toFixed(0)} ms (warm ${tWarm.toFixed(0)} ms) · title “${res.title}” · base ${res.base} · ${res.symbols.length} symbols · ${surveyed ? surveyed.length + ' cells, ' + Math.round(res.unsurveyed * 100) + '% unsurveyed' : 'whole view'}`;
   document.title = 'done';
 } catch (err) {
   log.textContent = 'ERROR: ' + (err.stack || err);

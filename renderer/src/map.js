@@ -55,6 +55,7 @@ export class TreasureMap extends EventTarget {
     this.store = new OsmStore();
     this.loader = new OverpassLoader(this.store, {
       endpoints: this.opts.endpoints,
+      cache: this.opts.cache !== false,
       onData: () => this._dataArrived(),
       onStatus: (s) => this._emit('status', s),
     });
@@ -107,7 +108,8 @@ export class TreasureMap extends EventTarget {
     const layout = hudLayout(this.w, this.h);
     let res;
     try {
-      res = this.renderer.render(this.frameCtx, v, this.store, { dpr: this.dpr, hud: layout, coastReady: this.loader.coastReady(v) });
+      const fogText = this.loader.error ? 'Overpass is busy. Still trying\u2026' : 'Surveying these parts\u2026';
+      res = this.renderer.render(this.frameCtx, v, this.store, { dpr: this.dpr, hud: layout, surveyed: this.loader.surveyed(v.bounds(130)), fogText });
     } catch (err) {
       console.error(err);
       return;

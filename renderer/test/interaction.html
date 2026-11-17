@@ -27,7 +27,7 @@ window.addEventListener('error', (e) => errors.push(e.message));
 window.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
 try {
   const endpoint = new URLSearchParams(location.search).get('overpass');
-  const map = new TreasureMap(document.getElementById('map'), { center: [-64.2935, 44.5135], zoom: 15.8, endpoints: [endpoint] });
+  const map = new TreasureMap(document.getElementById('map'), { center: [-64.2935, 44.5135], zoom: 15.8, endpoints: [endpoint], cache: !new URLSearchParams(location.search).has('nocache') });
   let renders = 0, lastStatus = null, selected = null;
   map.addEventListener('render', () => renders++);
   map.addEventListener('status', (e) => { lastStatus = e.detail; });
@@ -81,7 +81,7 @@ try {
   check('pinch zooms out', map.getZoom() < zp - 1, `${zp.toFixed(2)} -> ${map.getZoom().toFixed(2)}`);
 
   check('no script errors', errors.length === 0, errors.join(' | '));
-  check('loader is idle and error-free', lastStatus && !lastStatus.error, lastStatus && JSON.stringify(lastStatus));
+  check('loader reports no errors', lastStatus && !lastStatus.error, lastStatus && JSON.stringify(lastStatus));
 } catch (err) {
   results.push('FAIL  threw: ' + (err.stack || err));
 }

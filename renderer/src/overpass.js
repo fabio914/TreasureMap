@@ -33,7 +33,7 @@ way["natural"~"^(water|wood|scrub|heath|wetland|beach|sand|bare_rock|glacier|cli
 way["landuse"~"^(forest|reservoir|residential)$"];
 way["waterway"~"^(river|canal|riverbank)$"];
 relation["natural"~"^(water|wood|scrub|heath|wetland|glacier)$"];
-relation["landuse"~"^(forest|reservoir|residential)$"];
+relation["landuse"~"^(forest|reservoir)$"];
 relation["waterway"="riverbank"];
 node["place"~"^(city|town|village|hamlet|island|islet|archipelago|sea|ocean)$"];
 node["natural"~"^(peak|volcano|bay|cape|strait)$"]["name"];
@@ -67,18 +67,25 @@ way["place"="island"]["name"];
 relation["natural"~"^(bay|strait)$"]["name"];
 way["natural"~"^(bay|strait)$"]["name"];`;
 
-/** Detail tiers, finest first. A tier is used when the view zoom is >= minZoom. */
+/** Detail tiers, finest first. A tier is used when the view zoom is >= minZoom.
+ *  Each cell is one request; coastCell is a coarser coastline-only layer that tells land
+ *  from sea quickly (it's cheap) while the detail is still on its way. */
 export const TIERS = [
-  { key: 'detail', minZoom: 15.5, cell: 1024, coastCell: 16384, geom: DETAIL_GEOM, labels: LABELS },
-  { key: 'regional', minZoom: 12.5, cell: 8192, coastCell: 131072, geom: REGIONAL_GEOM, labels: LABELS },
-  { key: 'wide', minZoom: 0, cell: 65536, coastCell: 262144, geom: WIDE_GEOM, labels: WIDE_LABELS },
+  { key: 'detail', minZoom: 15.5, cell: 2048, coastCell: 16384, geom: DETAIL_GEOM, labels: LABELS },
+  { key: 'regional', minZoom: 12.5, cell: 16384, coastCell: 131072, geom: REGIONAL_GEOM, labels: LABELS },
+  { key: 'wide', minZoom: 0, cell: 131072, coastCell: 262144, geom: WIDE_GEOM, labels: WIDE_LABELS },
 ];
 export const tierFor = (zoom) => TIERS.find((t) => zoom >= t.minZoom) || TIERS[TIERS.length - 1];
 
+/** Public Overpass servers that allow requests from web pages (checked November 2026).
+ *  Requests alternate between them, and a failed request is retried on the other one. */
 export const DEFAULT_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
 ];
+
+const CACHE_NAME = 'treasure-map-osm-v1';
+const CACHE_DAYS = 30;
 
 function cellsIn(cell, r) {
   const out = [];
@@ -87,66 +94,81 @@ function cellsIn(cell, r) {
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) out.push([i, j]);
   return out;
 }
+const host = (url) => { try { return new URL(url).host; } catch { return url; } };
+const overlaps = (a, b) => a.minX <= b.maxX && b.minX <= a.maxX && a.minY <= b.maxY && b.minY <= a.maxY;
 
 export class OverpassLoader {
-  constructor(store, { endpoints = DEFAULT_ENDPOINTS, maxConcurrent = 2, onData = () => {}, onStatus = () => {} } = {}) {
+  constructor(store, { endpoints = DEFAULT_ENDPOINTS, maxConcurrent = 2, cache = true, onData = () => {}, onStatus = () => {} } = {}) {
     this.store = store;
     this.endpoints = endpoints;
     this.maxConcurrent = maxConcurrent;
+    this.useCache = cache && typeof caches !== 'undefined';
     this.onData = onData; this.onStatus = onStatus;
-    this.loaded = new Map();   // layerKey -> Set(cellKey)
-    this.pending = new Map();  // layerKey -> Set(cellKey)
+    this.layers = new Map();   // layerKey -> { cell, loaded: Set(cellKey), pending: Set(cellKey) }
     this.queue = [];
     this.active = 0;
-    this.endpointIndex = 0;
+    this.next = 0;             // round-robin over endpoints
     this.error = null;
+    this.retryAt = 0;
     this.bytes = 0;
+    this.focus = null;
   }
 
-  _set(map, key) { if (!map.has(key)) map.set(key, new Set()); return map.get(key); }
+  _layer(l) {
+    if (!this.layers.has(l.key)) this.layers.set(l.key, { cell: l.cell, loaded: new Set(), pending: new Set() });
+    return this.layers.get(l.key);
+  }
 
   /** Make sure everything needed to draw this view is loaded or on its way. */
   ensure(view) {
     const tier = tierFor(view.zoom);
-    const margin = Math.max(view.width * 0.12, 160);
-    this.focus = view.bounds(margin * 3);
-    this._need({ key: tier.key, cell: tier.cell, geom: tier.geom, labels: tier.labels }, view.bounds(margin), view.bounds(0));
-    // a coarse coastline-only layer tells land from sea when no coast crosses the view
-    this._need({ key: 'coast' + tier.coastCell, cell: tier.coastCell, geom: COAST_GEOM, labels: '' }, view.bounds(0), view.bounds(0));
+    this.focus = view.bounds(Math.max(view.width, view.height));
+    // the cheap coastline layer first, then the detail for this zoom
+    this._need({ key: 'coast' + tier.coastCell, cell: tier.coastCell, geom: COAST_GEOM, labels: '', coast: true }, view.bounds(0));
+    this._need({ key: tier.key, cell: tier.cell, geom: tier.geom, labels: tier.labels }, view.bounds(60));
     // forget queued requests for places we've left
     this.queue = this.queue.filter((job) => {
-      const keep = job.rect.minX <= this.focus.maxX && this.focus.minX <= job.rect.maxX && job.rect.minY <= this.focus.maxY && this.focus.minY <= job.rect.maxY;
-      if (!keep) { const p = this._set(this.pending, job.layer.key); job.cells.forEach((c) => p.delete(c)); }
+      const keep = overlaps(job.rect, this.focus);
+      if (!keep) this._layer(job.layer).pending.delete(job.cellKey);
       return keep;
     });
     this._pump();
     this._status();
   }
 
-  /** True when the coastline for rect has been loaded (so land and sea can be drawn correctly). */
-  coastReady(view, marginPx = 130) {
-    const tier = tierFor(view.zoom);
-    return this._covered(tier.key, tier.cell, view.bounds(marginPx)) || this._covered('coast' + tier.coastCell, tier.coastCell, view.bounds(marginPx));
+  /**
+   * The loaded cells covering rect, as disjoint world rectangles (coarsest first; a finer cell
+   * inside a coarser loaded one is skipped). Every loaded layer includes the coastline, so land
+   * and sea are known inside each of them.
+   */
+  surveyed(rect) {
+    const layers = [...this.layers.values()].sort((a, b) => b.cell - a.cell);
+    const out = [];
+    for (const L of layers) {
+      if (!L.loaded.size) continue;
+      for (const [i, j] of cellsIn(L.cell, rect)) {
+        if (!L.loaded.has(i + ',' + j)) continue;
+        const r = { minX: i * L.cell, minY: j * L.cell, maxX: (i + 1) * L.cell, maxY: (j + 1) * L.cell };
+        if (out.some((o) => r.minX >= o.minX && r.maxX <= o.maxX && r.minY >= o.minY && r.maxY <= o.maxY)) continue;
+        out.push(r);
+      }
+    }
+    return out;
   }
 
-  get busy() { return this.active > 0 || this.queue.length > 0; }
+  get busy() { return this.active > 0 || this.queue.length > 0 || [...this.layers.values()].some((L) => L.pending.size); }
 
-  _covered(key, cell, r) {
-    const done = this.loaded.get(key); if (!done) return false;
-    return cellsIn(cell, r).every(([i, j]) => done.has(i + ',' + j));
-  }
-
-  _need(layer, rect, core) {
-    const done = this._set(this.loaded, layer.key), pend = this._set(this.pending, layer.key);
-    let cells = cellsIn(layer.cell, rect).filter(([i, j]) => !done.has(i + ',' + j) && !pend.has(i + ',' + j));
-    if (cells.length > 30) cells = cellsIn(layer.cell, core).filter(([i, j]) => !done.has(i + ',' + j) && !pend.has(i + ',' + j));
-    if (!cells.length) return;
-    let i0 = Infinity, i1 = -Infinity, j0 = Infinity, j1 = -Infinity;
-    for (const [i, j] of cells) { i0 = Math.min(i0, i); i1 = Math.max(i1, i); j0 = Math.min(j0, j); j1 = Math.max(j1, j); }
-    const keys = cells.map(([i, j]) => i + ',' + j);
-    keys.forEach((k) => pend.add(k));
-    const r = { minX: i0 * layer.cell, maxX: (i1 + 1) * layer.cell, minY: j0 * layer.cell, maxY: (j1 + 1) * layer.cell };
-    this.queue.push({ layer, cells: keys, rect: r, tries: 0 });
+  _need(layer, rect) {
+    const L = this._layer(layer);
+    let cells = cellsIn(layer.cell, rect);
+    if (cells.length > 40) return; // far too much for one view; the controller's zoom limit should prevent this
+    for (const [i, j] of cells) {
+      const k = i + ',' + j;
+      if (L.loaded.has(k) || L.pending.has(k)) continue;
+      L.pending.add(k);
+      const r = { minX: i * layer.cell, maxX: (i + 1) * layer.cell, minY: j * layer.cell, maxY: (j + 1) * layer.cell };
+      this.queue.push({ layer, cellKey: k, rect: r, tries: 0 });
+    }
   }
 
   _query(job) {
@@ -159,47 +181,79 @@ export class OverpassLoader {
   }
 
   _pump() {
-    while (this.active < this.maxConcurrent && this.queue.length) {
-      // nearest job to the view first
-      const fx = (this.focus.minX + this.focus.maxX) / 2, fy = (this.focus.minY + this.focus.maxY) / 2;
-      this.queue.sort((a, b) => dist(a.rect, fx, fy) - dist(b.rect, fx, fy));
-      this._run(this.queue.shift());
-    }
+    if (!this.focus) return;
+    const fx = (this.focus.minX + this.focus.maxX) / 2, fy = (this.focus.minY + this.focus.maxY) / 2;
+    // coastline cells first (they decide land and sea), then nearest to the centre of the view
+    this.queue.sort((a, b) => (a.layer.coast ? 0 : 1) - (b.layer.coast ? 0 : 1) || dist(a.rect, fx, fy) - dist(b.rect, fx, fy));
+    while (this.active < this.maxConcurrent && this.queue.length) this._run(this.queue.shift());
+  }
+
+  _cacheKey(job) { return `${location.origin}/__treasure-map-cache/${job.layer.key}/${job.cellKey}`; }
+
+  async _fromCache(job) {
+    if (!this.useCache) return null;
+    // a cache that is slow to answer must never hold up the survey
+    return Promise.race([this._readCache(job), new Promise((r) => setTimeout(() => r(null), 1500))]);
+  }
+
+  async _readCache(job) {
+    try {
+      const cache = await caches.open(CACHE_NAME);
+      const hit = await cache.match(this._cacheKey(job));
+      if (!hit) return null;
+      const saved = +hit.headers.get('x-saved') || 0;
+      if (Date.now() - saved > CACHE_DAYS * 864e5) return null;
+      return await hit.text();
+    } catch { return null; }
+  }
+
+  async _toCache(job, text) {
+    if (!this.useCache) return;
+    try {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(this._cacheKey(job), new Response(text, { headers: { 'content-type': 'application/json', 'x-saved': String(Date.now()) } }));
+    } catch { /* storage full or unavailable: carry on without it */ }
   }
 
   async _run(job) {
     this.active++; this._status();
-    const url = this.endpoints[this.endpointIndex % this.endpoints.length];
+    const L = this._layer(job.layer);
+    const ep = job.ep ?? this.next++ % this.endpoints.length;
+    const url = this.endpoints[ep % this.endpoints.length];
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 120000);
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'data=' + encodeURIComponent(this._query(job)),
-        signal: ctrl.signal,
-      });
-      if (!res.ok) throw Object.assign(new Error(`Overpass answered ${res.status}`), { status: res.status });
-      const text = await res.text();
-      this.bytes += text.length;
+      let text = await this._fromCache(job), fresh = false;
+      if (text == null) {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'data=' + encodeURIComponent(this._query(job)),
+          signal: ctrl.signal,
+        });
+        if (!res.ok) throw new Error(`${host(url)} answered ${res.status}${res.status === 429 ? ' (too many requests)' : res.status >= 502 ? ' (busy)' : ''}`);
+        text = await res.text();
+        fresh = true;
+      }
       const json = JSON.parse(text);
-      if (json.remark && /runtime error|timed out|out of memory/i.test(json.remark)) throw new Error('Overpass: ' + json.remark);
+      if (json.remark && /runtime error|timed out|out of memory/i.test(json.remark)) throw new Error(`${host(url)}: ${json.remark}`);
       this.store.ingest(json.elements || []);
-      const done = this._set(this.loaded, job.layer.key), pend = this._set(this.pending, job.layer.key);
-      job.cells.forEach((c) => { pend.delete(c); done.add(c); });
+      if (fresh) { this.bytes += text.length; this._toCache(job, text); }
+      L.pending.delete(job.cellKey); L.loaded.add(job.cellKey);
       this.error = null;
       this.onData(job);
     } catch (err) {
-      const pend = this._set(this.pending, job.layer.key);
+      // keep trying, on the other server, backing off up to 30 s
       job.tries++;
-      this.endpointIndex++;
-      this.error = err.name === 'AbortError' ? 'Overpass took too long to answer' : err.message || String(err);
-      if (job.tries < 5) {
-        const wait = Math.min(30000, 2000 * 2 ** job.tries);
-        setTimeout(() => { this.queue.push(job); this._pump(); this._status(); }, wait);
-      } else {
-        job.cells.forEach((c) => pend.delete(c));
-      }
+      job.ep = ep + 1;
+      this.error = err.name === 'AbortError' ? `${host(url)} took too long to answer` : (err.message || String(err));
+      const wait = Math.min(30000, 2000 * 2 ** Math.min(job.tries, 4)) * (0.75 + Math.random() * 0.5);
+      this.retryAt = Date.now() + wait;
+      setTimeout(() => {
+        if (this.focus && overlaps(job.rect, this.focus)) this.queue.push(job);
+        else L.pending.delete(job.cellKey);
+        this._pump(); this._status();
+      }, wait);
     } finally {
       clearTimeout(timer);
       this.active--;
@@ -209,7 +263,12 @@ export class OverpassLoader {
   }
 
   _status() {
-    this.onStatus({ active: this.active, queued: this.queue.length, error: this.error, bytes: this.bytes, features: this.store.items.size + this.store.coast.size });
+    const waiting = [...this.layers.values()].reduce((n, L) => n + L.pending.size, 0);
+    this.onStatus({
+      active: this.active, queued: this.queue.length, waiting,
+      error: this.error, retryIn: this.error ? Math.max(0, Math.round((this.retryAt - Date.now()) / 1000)) : 0,
+      bytes: this.bytes, features: this.store.items.size + this.store.coast.size,
+    });
   }
 }
 
